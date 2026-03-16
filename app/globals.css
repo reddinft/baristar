@@ -1,0 +1,123 @@
+@import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,700;1,400&display=swap');
+@import "tailwindcss";
+
+:root {
+  --espresso: #3d1c02;
+  --cream: #f5f0e8;
+  --caramel: #d4860b;
+  --warm-white: #faf7f2;
+  --teal: #2dd4bf;
+  --dark-roast: #1a0d00;
+  --steam-grey: #7a6a5a;
+  --raspberry: #c0392b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--warm-white);
+  color: var(--dark-roast);
+  min-height: 100vh;
+  /* Subtle paper grain texture */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='discrete' tableValues='0 0.03'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23noise)' opacity='1'/%3E%3C/svg%3E");
+  background-blend-mode: multiply;
+}
+
+.font-marker {
+  font-family: 'Permanent Marker', cursive;
+}
+
+.font-display {
+  font-family: 'Playfair Display', serif;
+}
+
+/* Cup name overlay */
+.cup-name-overlay {
+  font-family: 'Permanent Marker', cursive;
+  color: #1a1a1a;
+  text-shadow: 1px 1px 0px rgba(0,0,0,0.1);
+  position: absolute;
+  transform-origin: center;
+}
+
+/* Coffee cup loading animation */
+@keyframes fill-cup {
+  0% { height: 0%; opacity: 0.5; }
+  100% { height: 75%; opacity: 1; }
+}
+
+@keyframes steam-rise {
+  0% { opacity: 0; transform: translateY(0) scaleX(1); }
+  50% { opacity: 0.7; transform: translateY(-15px) scaleX(1.2); }
+  100% { opacity: 0; transform: translateY(-30px) scaleX(0.8); }
+}
+
+@keyframes marker-draw {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.steam-1 { animation: steam-rise 2s ease-in-out infinite; }
+.steam-2 { animation: steam-rise 2s ease-in-out infinite 0.7s; }
+.steam-3 { animation: steam-rise 2s ease-in-out infinite 1.4s; }
+
+/* VS badge */
+.vs-badge {
+  background: var(--caramel);
+  color: white;
+  font-weight: 700;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* Gallery card */
+.gallery-card {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(61, 28, 2, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gallery-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(61, 28, 2, 0.14);
+}
+
+/* Cup card */
+.cup-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--cream);
+  box-shadow: 0 4px 20px rgba(61, 28, 2, 0.12);
+}
+
+/* Share button styles */
+.share-btn-instagram {
+  background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+}
+
+.share-btn-twitter {
+  background: #000;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--cream); }
+::-webkit-scrollbar-thumb { background: var(--caramel); border-radius: 3px; }
