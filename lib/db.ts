@@ -1,21 +1,26 @@
-import Database from 'better-sqlite3';
-import path from 'path';
-import fs from 'fs';
+import { createClient } from '@libsql/client';
 
-const DB_PATH = process.env.NODE_ENV === 'test'
-  ? '/tmp/baristar-test.db'
-  : path.join(process.cwd(), 'baristar.db');
+function getClient() {
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
 
-let _db: Database.Database | null = null;
+  if (url && authToken) {
+    return createClient({ url, authToken });
+  }
 
-export function getDb(): Database.Database {
-  if (_db) return _db;
-  
-  _db = new Database(DB_PATH);
-  _db.pragma('journal_mode = WAL');
-  
-  // Create tables
-  _db.exec(`
+  // Local dev fallback
+  return createClient({ url: 'file:./baristar-local.db' });
+}
+
+const client = getClient();
+
+// Initialize schema
+let schemaInitialized = false;
+
+export async function ensureSchema() {
+  if (schemaInitialized) return;
+
+  await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       original_name TEXT NOT NULL,
@@ -38,8 +43,12 @@ export function getDb(): Database.Database {
       created_at INTEGER DEFAULT (unixepoch())
     );
   `);
-  
-  return _db;
+
+  schemaInitialized = true;
+}
+
+export function getDb() {
+  return client;
 }
 
 export interface SessionRecord {

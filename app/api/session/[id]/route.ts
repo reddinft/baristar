@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { getDb, ensureSchema } from '@/lib/db';
 
 export async function GET(
   req: NextRequest,
@@ -7,35 +7,34 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
+    await ensureSchema();
     const db = getDb();
-    
-    const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as {
-      id: string;
-      original_name: string;
-      primary_misspelling: string;
-      misspellings_json: string;
-      image_url: string | null;
-      created_at: number;
-    } | undefined;
-    
-    if (!session) {
+
+    const result = await db.execute({
+      sql: 'SELECT * FROM sessions WHERE id = ?',
+      args: [id],
+    });
+
+    if (result.rows.length === 0) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    const misspellings = JSON.parse(session.misspellings_json);
+    const row = result.rows[0];
+
+    const misspellings = JSON.parse(row.misspellings_json as string);
 
     return NextResponse.json({
-      sessionId: session.id,
-      originalName: session.original_name,
-      primaryMisspelling: session.primary_misspelling,
+      sessionId: row.id,
+      originalName: row.original_name,
+      primaryMisspelling: row.primary_misspelling,
       misspellings: misspellings.map((opt: { misspelling: string; baristas_excuse: string; pattern: string; rank: number }) => ({
         name: opt.misspelling,
         excuse: opt.baristas_excuse,
         pattern: opt.pattern,
         rank: opt.rank,
       })),
-      imageUrl: session.image_url,
-      createdAt: session.created_at,
+      imageUrl: row.image_url,
+      createdAt: row.created_at,
     });
 
   } catch (error) {

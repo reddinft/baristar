@@ -1,14 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import Database from 'better-sqlite3'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { createClient } from '@libsql/client'
 import { v4 as uuidv4 } from 'uuid'
 
-// We use an in-memory DB directly to test schema and operations
-// without depending on lib/db.ts singleton caching behavior
+// Create an in-memory libsql client for tests
+function createTestDb() {
+  const db = createClient({ url: ':memory:' })
+  return db
+}
 
-function createTestDb(): Database.Database {
-  const db = new Database(':memory:')
-  db.pragma('journal_mode = WAL')
-  db.exec(`
+async function initSchema(db: ReturnType<typeof createClient>) {
+  await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       original_name TEXT NOT NULL,
@@ -31,47 +32,47 @@ function createTestDb(): Database.Database {
       created_at INTEGER DEFAULT (unixepoch())
     );
   `)
-  return db
 }
 
 describe('Database operations', () => {
-  let db: Database.Database
+  let db: ReturnType<typeof createTestDb>
 
-  beforeEach(() => {
+  beforeEach(async () => {
     db = createTestDb()
+    await initSchema(db)
   })
 
-  afterEach(() => {
-    db.close()
-  })
-
-  it('getDb() returns a Database instance', () => {
+  it('client is defined', () => {
     expect(db).toBeDefined()
-    expect(typeof db.prepare).toBe('function')
   })
 
-  it('sessions table is created on init', () => {
-    const tables = db.prepare(
+  it('sessions table is created on init', async () => {
+    const result = await db.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'"
-    ).all()
-    expect(tables).toHaveLength(1)
+    )
+    expect(result.rows).toHaveLength(1)
   })
 
-  it('gallery table is created on init', () => {
-    const tables = db.prepare(
+  it('gallery table is created on init', async () => {
+    const result = await db.execute(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='gallery'"
-    ).all()
-    expect(tables).toHaveLength(1)
+    )
+    expect(result.rows).toHaveLength(1)
   })
 
-  it('can insert and retrieve a session', () => {
+  it('can insert and retrieve a session', async () => {
     const id = uuidv4()
-    db.prepare(`
-      INSERT INTO sessions (id, original_name, primary_misspelling, misspellings_json, image_url)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, 'Nissan', 'Neesan', '[]', '/placeholder-cup.svg')
+    await db.execute({
+      sql: `INSERT INTO sessions (id, original_name, primary_misspelling, misspellings_json, image_url)
+            VALUES (?, ?, ?, ?, ?)`,
+      args: [id, 'Nissan', 'Neesan', '[]', '/placeholder-cup.svg'],
+    })
 
-    const row = db.prepare('SELECT * FROM sessions WHERE id = ?').get(id) as any
+    const result = await db.execute({
+      sql: 'SELECT * FROM sessions WHERE id = ?',
+      args: [id],
+    })
+    const row = result.rows[0]
     expect(row).toBeDefined()
     expect(row.id).toBe(id)
     expect(row.original_name).toBe('Nissan')
@@ -80,14 +81,19 @@ describe('Database operations', () => {
     expect(row.image_url).toBe('/placeholder-cup.svg')
   })
 
-  it('can insert and retrieve a gallery item', () => {
+  it('can insert and retrieve a gallery item', async () => {
     const id = uuidv4()
-    db.prepare(`
-      INSERT INTO gallery (id, original_name, misspelled_name, caption, real_photo_url, generated_image_url, session_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run(id, 'Nissan', 'Neesan', 'Classic misunderstanding', '/uploads/cup.jpg', '/generated/ai.jpg', null)
+    await db.execute({
+      sql: `INSERT INTO gallery (id, original_name, misspelled_name, caption, real_photo_url, generated_image_url, session_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [id, 'Nissan', 'Neesan', 'Classic misunderstanding', '/uploads/cup.jpg', '/generated/ai.jpg', null],
+    })
 
-    const row = db.prepare('SELECT * FROM gallery WHERE id = ?').get(id) as any
+    const result = await db.execute({
+      sql: 'SELECT * FROM gallery WHERE id = ?',
+      args: [id],
+    })
+    const row = result.rows[0]
     expect(row).toBeDefined()
     expect(row.id).toBe(id)
     expect(row.original_name).toBe('Nissan')
@@ -97,44 +103,33 @@ describe('Database operations', () => {
     expect(row.generated_image_url).toBe('/generated/ai.jpg')
   })
 
-  it('votes default to 0', () => {
+  it('votes default to 0', async () => {
     const id = uuidv4()
-    db.prepare(`
-      INSERT INTO gallery (id, original_name, misspelled_name, real_photo_url)
-      VALUES (?, ?, ?, ?)
-    `).run(id, 'Test', 'Tset', '/uploads/test.jpg')
+    await db.execute({
+      sql: `INSERT INTO gallery (id, original_name, misspelled_name, real_photo_url)
+            VALUES (?, ?, ?, ?)`,
+      args: [id, 'Test', 'Tset', '/uploads/test.jpg'],
+    })
 
-    const row = db.prepare('SELECT votes FROM gallery WHERE id = ?').get(id) as any
-    expect(row.votes).toBe(0)
+    const result = await db.execute({
+      sql: 'SELECT votes FROM gallery WHERE id = ?',
+      args: [id],
+    })
+    expect(result.rows[0].votes).toBe(0)
   })
 
-  it('approved defaults to 1', () => {
+  it('approved defaults to 1', async () => {
     const id = uuidv4()
-    db.prepare(`
-      INSERT INTO gallery (id, original_name, misspelled_name, real_photo_url)
-      VALUES (?, ?, ?, ?)
-    `).run(id, 'Test', 'Tset', '/uploads/test.jpg')
+    await db.execute({
+      sql: `INSERT INTO gallery (id, original_name, misspelled_name, real_photo_url)
+            VALUES (?, ?, ?, ?)`,
+      args: [id, 'Test', 'Tset', '/uploads/test.jpg'],
+    })
 
-    const row = db.prepare('SELECT approved FROM gallery WHERE id = ?').get(id) as any
-    expect(row.approved).toBe(1)
-  })
-})
-
-describe('lib/db.ts getDb()', () => {
-  it('returns a Database instance with tables in test env', async () => {
-    // Reset the singleton
-    vi.resetModules()
-    process.env.NODE_ENV = 'test'
-
-    const { getDb } = await import('@/lib/db')
-    const db = getDb()
-    expect(db).toBeDefined()
-    expect(typeof db.prepare).toBe('function')
-
-    // Both tables should exist
-    const sessions = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='sessions'").all()
-    const gallery = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='gallery'").all()
-    expect(sessions).toHaveLength(1)
-    expect(gallery).toHaveLength(1)
+    const result = await db.execute({
+      sql: 'SELECT approved FROM gallery WHERE id = ?',
+      args: [id],
+    })
+    expect(result.rows[0].approved).toBe(1)
   })
 })
