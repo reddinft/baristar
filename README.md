@@ -1,36 +1,135 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ☕ Baristar — Your name. Destroyed with love.
 
-## Getting Started
+> Find out what a barista would write on your coffee cup — powered by GPT-4o-mini and FLUX.1 image generation.
 
-First, run the development server:
+## What it does
+
+1. Enter your name → barista AI misspells it 3 ways (GPT-4o-mini)
+2. FLUX.1 [schnell] generates a photorealistic coffee cup image
+3. Misspelled name overlaid via CSS `Permanent Marker` font (guarantees legibility)
+4. Share on Instagram / X, or upload your real barista fail to the community Wall of Shame
+
+## Stack
+
+- **Framework:** Next.js 15 (App Router, TypeScript)
+- **Styling:** Tailwind CSS + Google Fonts (Permanent Marker, Playfair Display, Inter)
+- **Misspellings:** OpenAI GPT-4o-mini (`$0.0002/request` — basically free)
+- **Image gen:** fal.ai FLUX.1 [schnell] (`$0.003/image`)
+- **DB (local dev):** SQLite via better-sqlite3
+- **DB (production):** Cloudflare D1
+- **Storage (production):** Cloudflare R2 (10GB free, zero egress)
+- **Hosting:** Cloudflare Pages
+
+## Quick start
 
 ```bash
+# 1. Clone and install
+cd projects/coffee-name/baristar
+npm install
+
+# 2. Set up env (already done if .env.local exists)
+cp .env.example .env.local
+# Edit .env.local and add your keys
+
+# 3. Run dev server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+# → http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Environment variables
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | ✅ Yes | GPT-4o-mini for name misspellings |
+| `FAL_KEY` | ✅ Yes | fal.ai FLUX.1 [schnell] image generation |
+| `CLOUDFLARE_ACCOUNT_ID` | Prod only | For D1 + R2 |
+| `CLOUDFLARE_R2_ACCESS_KEY` | Prod only | R2 storage |
+| `CLOUDFLARE_R2_SECRET_KEY` | Prod only | R2 storage |
+| `CLOUDFLARE_R2_BUCKET_NAME` | Prod only | Default: `baristar` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**Getting keys:**
+- OpenAI: https://platform.openai.com/api-keys
+- fal.ai: https://fal.ai/dashboard — sign up, create API key, store in 1Password as `"fal.ai API Key"`
 
-## Learn More
+## API routes
 
-To learn more about Next.js, take a look at the following resources:
+### `POST /api/generate`
+Generate misspellings + cup image for a name.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```json
+// Request
+{ "name": "Sarah" }
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+// Response
+{
+  "sessionId": "uuid",
+  "misspellings": [
+    { "name": "Saarahh", "excuse": "My hand slipped twice.", "rank": 1 },
+    { "name": "Serah", "excuse": "The espresso machine was loud.", "rank": 2 },
+    { "name": "Sarah-Mae", "excuse": "I felt you deserved a middle name.", "rank": 3 }
+  ],
+  "imageUrl": "/generated/cup-xxx.jpg",
+  "primaryMisspelling": "Saarahh",
+  "originalName": "Sarah"
+}
+```
 
-## Deploy on Vercel
+### `GET /api/gallery`
+Returns community uploads (last 20, most recent first).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Query params: `limit` (max 50), `offset`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### `POST /api/upload`
+Multipart form upload: `photo` (File), `originalName`, `misspelledName`, `caption`, `sessionId` (optional)
+
+### `GET /api/session/[id]`
+Retrieve a session by ID (used by result page).
+
+### `POST /api/gallery/[id]/vote`
+Upvote a gallery entry.
+
+## Routes / Pages
+
+| Route | Description |
+|---|---|
+| `/` | Landing — name input + gallery teaser |
+| `/result/[sessionId]` | Generated result — cup image, misspellings, share buttons |
+| `/gallery` | Community Wall of Shame — VS compare grid |
+
+## Dev notes
+
+- **SQLite** lives at `baristar.db` in the project root (gitignored)
+- **Generated images** saved to `public/generated/` (gitignored)
+- **Uploaded photos** saved to `public/uploads/` (gitignored)
+- Both directories have `.gitkeep` to preserve them in git
+- No auth — gallery is public, uploads are unmoderated (basic size/type validation only)
+- IP rate limiting: TODO for production (add Cloudflare WAF rule or middleware)
+
+## Production deployment (Cloudflare Pages)
+
+```bash
+# Install Wrangler
+npm install -g wrangler
+
+# Create D1 database
+wrangler d1 create baristar-db
+
+# Create R2 bucket
+wrangler r2 bucket create baristar
+
+# Deploy
+npm run build
+wrangler pages deploy .next
+```
+
+## Cost estimate (10k users/day)
+
+| Service | Cost/month |
+|---|---|
+| GPT-4o-mini (misspellings) | ~$18 |
+| fal.ai FLUX.1 schnell (images, with 60% cache hit) | ~$360 |
+| Cloudflare Pages + Workers | ~$5–20 |
+| Cloudflare R2 (20GB images) | ~$0.30 |
+| **Total** | **~$385/month** |
+
+With name caching (same name = cached image), popular names like "Sarah" and "James" are free on repeat.
