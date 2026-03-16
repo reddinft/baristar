@@ -212,7 +212,7 @@ export function ResultClient({ session }: ResultClientProps) {
                 📸 Save for Instagram
               </button>
               <a
-                href={`https://twitter.com/intent/tweet?text=${buildTweetText()}`}
+                href={`https://x.com/intent/post?text=${buildTweetText()}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="share-btn-twitter flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity hover:opacity-80"
