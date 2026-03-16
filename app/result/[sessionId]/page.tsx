@@ -99,7 +99,7 @@ export default function ResultPage({
     if (!session?.imageUrl) return;
     const a = document.createElement('a');
     a.href = session.imageUrl;
-    a.download = `baristar-${session.originalName}.png`;
+    a.download = `barry-starr-${session.originalName}.png`;
     a.target = '_blank';
     document.body.appendChild(a);
     a.click();

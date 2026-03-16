@@ -50,7 +50,7 @@ export function ResultClient({ session }: ResultClientProps) {
 
   function buildTweetText() {
     return encodeURIComponent(
-      `gave a barista my name. they gave it their best shot.\n\ntheir best shot was "${selected.name}"\n\nbaristar.app — find out what you'd be called ☕`
+      `gave Barry Starr my name. he gave it his best shot.\n\nhis best shot was "${selected.name}"\n\nbarrystarr.app — find out what he'd call you ☕`
     );
   }
 
@@ -58,7 +58,7 @@ export function ResultClient({ session }: ResultClientProps) {
     // Download the cup image for sharing
     const link = document.createElement('a');
     link.href = imageUrl;
-    link.download = `baristar-${selected.name}.jpg`;
+    link.download = `barry-starr-${selected.name}.jpg`;
     link.click();
   }
 

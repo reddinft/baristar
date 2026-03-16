@@ -1,6 +1,6 @@
-# ☕ Baristar — Your name. Destroyed with love.
+# ☕ Barry Starr — Your Name, Ruined
 
-> Find out what a barista would write on your coffee cup — powered by GPT-4o-mini and FLUX.1 image generation.
+> Barry Starr is the world's worst barista. He's heard your name. He's already misspelled it. Find out what he wrote on your cup — powered by GPT-4o-mini and FLUX.1 image generation.
 
 ## What it does
 

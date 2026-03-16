@@ -2,12 +2,14 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Baristar — Your name. Destroyed with love.',
-  description: 'Find out what a barista would write on your coffee cup. Powered by AI and a deep misunderstanding of vowels.',
+  title: 'Barry Starr | Your Name, Ruined',
+  description: 'Barry Starr is the world\'s worst barista. He\'s heard your name. He\'s already misspelled it. Find out what he wrote on your cup.',
   openGraph: {
-    title: 'Baristar — Your name. Destroyed with love.',
-    description: 'Find out what a barista would write on your coffee cup.',
+    title: 'Barry Starr | Your Name, Ruined',
+    description: 'Barry Starr is the world\'s worst barista. He\'s heard your name. He\'s already misspelled it.',
     type: 'website',
+    url: 'https://barrystarr.app',
+    siteName: 'Barry Starr',
   },
 };
 

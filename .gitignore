@@ -21,3 +21,4 @@ baristar.db-wal
 # OS
 .DS_Store
 tsconfig.tsbuildinfo
+.vercel
