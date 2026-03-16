@@ -2,7 +2,9 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 
-const DB_PATH = path.join(process.cwd(), 'baristar.db');
+const DB_PATH = process.env.NODE_ENV === 'test'
+  ? '/tmp/baristar-test.db'
+  : path.join(process.cwd(), 'baristar.db');
 
 let _db: Database.Database | null = null;
 
