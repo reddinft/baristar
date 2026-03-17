@@ -1,3 +1,11 @@
+export interface VoiceMetadata {
+  transcript: string
+  detected_language: string
+  language_probability: number
+  phonetic_hints: string
+  raw_words?: Array<{ word: string; probability: number }>
+}
+
 export interface MisspellingOption {
   rank: number;
   misspelling: string;
@@ -124,13 +132,44 @@ Return ONLY valid JSON in this exact format:
 
 Do not include any explanation outside the JSON block.`;
 
-export async function generateMisspellings(name: string): Promise<MisspellingResult> {
+function buildVoiceSection(voiceMetadata: VoiceMetadata): string {
+  const wordConfidence = voiceMetadata.raw_words
+    ? `- Word-level confidence: ${voiceMetadata.raw_words.map((w) => `"${w.word}" (${Math.round(w.probability * 100)}%)`).join(', ')}`
+    : '';
+
+  return `
+---
+WHAT BARRY ACTUALLY HEARD:
+- Transcript of audio: "${voiceMetadata.transcript}"
+- Detected language/accent: ${voiceMetadata.detected_language} (confidence: ${Math.round(voiceMetadata.language_probability * 100)}%)
+- Audio quality notes: ${voiceMetadata.phonetic_hints}
+${wordConfidence}
+
+IMPORTANT CULTURAL SAFETY RULE:
+The detected accent/language tells you WHERE THIS PERSON IS FROM. This is NOT a target for mockery.
+Barry's misspellings must come from HIS confusion and HIS mishearing — never from mocking the customer's cultural background or accent.
+If the name has non-English origins, Barry simply heard something unfamiliar and his brain filled in the gaps from HIS reference frame (pop culture, English phonetics, things he half-remembers).
+A name from Irish = Barry wrote what HE heard, not a mock-Irish spelling.
+A name from Arabic = Barry decoded it through HIS English-speaker brain, not a caricature.
+The joke is always Barry. Never the customer.
+
+USE THE AUDIO METADATA: Because you know what Barry actually heard (the transcript) and how clearly he heard it (word probabilities), generate misspellings that reflect his ACTUAL mishearing — not just a theoretical one. If the transcript already shows a phonetic drift from the original name, lean into that. If confidence was low on a specific syllable, that's where Barry's imagination filled in the gap.`;
+}
+
+export async function generateMisspellings(
+  name: string,
+  voiceMetadata?: VoiceMetadata
+): Promise<MisspellingResult> {
   const apiKey = process.env.OPENAI_API_KEY;
   
   if (!apiKey) {
     // Fallback for when no API key is set
     return getFallbackMisspellings(name);
   }
+
+  const systemPrompt = voiceMetadata
+    ? SYSTEM_PROMPT + buildVoiceSection(voiceMetadata)
+    : SYSTEM_PROMPT;
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -142,7 +181,7 @@ export async function generateMisspellings(name: string): Promise<MisspellingRes
       body: JSON.stringify({
         model: 'gpt-5.4',
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           { role: 'user', content: name },
         ],
         temperature: 1.1,

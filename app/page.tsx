@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 const LOADING_MESSAGES = [
@@ -22,6 +22,16 @@ interface GalleryItem {
   generated_image_url: string | null;
 }
 
+interface VoiceMetadata {
+  transcript: string;
+  detected_language: string;
+  language_probability: number;
+  phonetic_hints: string;
+  raw_words?: Array<{ word: string; probability: number }>;
+}
+
+type RecordingState = 'idle' | 'recording' | 'transcribing' | 'heard';
+
 export default function Home() {
   const router = useRouter();
   const [name, setName] = useState('');
@@ -30,6 +40,16 @@ export default function Home() {
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Voice state
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
+  const [voiceMetadata, setVoiceMetadata] = useState<VoiceMetadata | null>(null);
+  const [barrysTranscript, setBarrysTranscript] = useState('');
+  const [micError, setMicError] = useState('');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
     fetch('/api/gallery?limit=6')
@@ -54,16 +74,127 @@ export default function Home() {
     };
   }, [loading]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!name.trim()) return;
+  const stopRecording = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearTimeout(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+      mediaRecorderRef.current.stop();
+    }
+  }, []);
+
+  const transcribeAudio = useCallback(
+    async (blob: Blob) => {
+      setRecordingState('transcribing');
+      try {
+        const fd = new FormData();
+        fd.append('audio', blob, 'audio.webm');
+        const res = await fetch('/api/transcribe', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Transcription failed');
+        const data: VoiceMetadata & { avg_logprob: number; words: Array<{ word: string; start: number; end: number; probability: number }> } =
+          await res.json();
+
+        const meta: VoiceMetadata = {
+          transcript: data.transcript,
+          detected_language: data.detected_language,
+          language_probability: data.language_probability,
+          phonetic_hints: data.phonetic_hints,
+          raw_words: data.words?.map((w) => ({ word: w.word, probability: w.probability })),
+        };
+
+        setVoiceMetadata(meta);
+        setBarrysTranscript(data.transcript);
+        setRecordingState('heard');
+
+        // If no name typed yet, pre-fill from transcript
+        if (!name.trim()) {
+          setName(data.transcript);
+        }
+
+        // Auto-generate after 1.5s
+        setTimeout(() => {
+          triggerGenerate(name.trim() || data.transcript, meta);
+        }, 1500);
+      } catch {
+        setMicError('Transcription failed — you can still type your name below.');
+        setRecordingState('idle');
+      }
+    },
+    [name] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
+  const startRecording = useCallback(async () => {
+    setMicError('');
+    setVoiceMetadata(null);
+    setBarrysTranscript('');
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicError('Barry needs to hear your name — your browser doesn\'t support microphone access.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : MediaRecorder.isTypeSupported('audio/ogg')
+        ? 'audio/ogg'
+        : '';
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = recorder;
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        // Stop all tracks to release mic
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+
+        const blob = new Blob(audioChunksRef.current, { type: mimeType || 'audio/webm' });
+        transcribeAudio(blob);
+      };
+
+      recorder.start();
+      setRecordingState('recording');
+
+      // Auto-stop after 4 seconds
+      recordingTimerRef.current = setTimeout(() => {
+        stopRecording();
+      }, 4000);
+    } catch {
+      setMicError('Barry needs to hear your name — allow microphone access');
+      setRecordingState('idle');
+    }
+  }, [transcribeAudio, stopRecording]);
+
+  const handleMicClick = useCallback(() => {
+    if (recordingState === 'recording') {
+      stopRecording();
+    } else if (recordingState === 'idle' || recordingState === 'heard') {
+      startRecording();
+    }
+  }, [recordingState, startRecording, stopRecording]);
+
+  async function triggerGenerate(nameToUse: string, meta?: VoiceMetadata | null) {
+    const canonical = nameToUse.trim();
+    if (!canonical) return;
     setLoading(true);
     setError('');
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
+        body: JSON.stringify({
+          name: canonical,
+          ...(meta ? { voiceMetadata: meta } : {}),
+        }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -76,6 +207,17 @@ export default function Home() {
       setLoading(false);
     }
   }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    await triggerGenerate(name, voiceMetadata);
+  }
+
+  const transcriptDiffers =
+    barrysTranscript &&
+    name.trim() &&
+    barrysTranscript.toLowerCase().trim() !== name.toLowerCase().trim();
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4">
@@ -102,14 +244,15 @@ export default function Home() {
       <section className="w-full max-w-md">
         {!loading ? (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="relative">
+            {/* Name input + mic button */}
+            <div className="relative flex items-center gap-2">
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your actual name (we'll ruin it beautifully)"
                 maxLength={50}
-                className="w-full px-5 py-4 text-lg rounded-xl border-2 outline-none transition-all"
+                className="flex-1 px-5 py-4 text-lg rounded-xl border-2 outline-none transition-all"
                 style={{
                   borderColor: 'var(--caramel)',
                   background: 'white',
@@ -122,13 +265,121 @@ export default function Home() {
                 onBlur={(e) => {
                   e.target.style.boxShadow = 'none';
                 }}
-                disabled={loading}
+                disabled={loading || recordingState === 'recording' || recordingState === 'transcribing'}
                 autoFocus
               />
+              {/* Mic button */}
+              <button
+                type="button"
+                onClick={handleMicClick}
+                disabled={recordingState === 'transcribing' || loading}
+                title={
+                  recordingState === 'recording'
+                    ? 'Click to stop'
+                    : recordingState === 'transcribing'
+                    ? 'Transcribing...'
+                    : 'Say your name'
+                }
+                className="flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-all border-2"
+                style={{
+                  background:
+                    recordingState === 'recording' ? '#E03E2D' : 'white',
+                  borderColor:
+                    recordingState === 'recording' ? '#E03E2D' : 'var(--caramel)',
+                  color:
+                    recordingState === 'recording'
+                      ? 'white'
+                      : recordingState === 'transcribing'
+                      ? 'var(--caramel)'
+                      : 'var(--espresso)',
+                  animation:
+                    recordingState === 'recording' ? 'pulse 1s infinite' : 'none',
+                  opacity: recordingState === 'transcribing' ? 0.6 : 1,
+                }}
+              >
+                {recordingState === 'transcribing' ? (
+                  <span className="text-lg animate-spin">⏳</span>
+                ) : recordingState === 'recording' ? (
+                  /* Waveform bars while recording */
+                  <span className="flex items-end gap-0.5 h-5">
+                    {[0, 1, 2, 3].map((i) => (
+                      <span
+                        key={i}
+                        className="w-1 rounded-full bg-white"
+                        style={{
+                          height: `${60 + i * 10}%`,
+                          animation: `waveBar 0.6s ease-in-out ${i * 0.1}s infinite alternate`,
+                        }}
+                      />
+                    ))}
+                  </span>
+                ) : (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-6 h-6"
+                  >
+                    <path d="M12 1a4 4 0 0 0-4 4v7a4 4 0 0 0 8 0V5a4 4 0 0 0-4-4zm-1 4a1 1 0 0 1 2 0v7a1 1 0 0 1-2 0V5z" />
+                    <path d="M5.25 10.5a.75.75 0 0 1 .75.75 6 6 0 0 0 12 0 .75.75 0 0 1 1.5 0 7.5 7.5 0 0 1-6.75 7.455V21h2.25a.75.75 0 0 1 0 1.5h-6a.75.75 0 0 1 0-1.5h2.25v-2.295A7.5 7.5 0 0 1 4.5 11.25a.75.75 0 0 1 .75-.75z" />
+                  </svg>
+                )}
+              </button>
             </div>
+
+            {/* Recording label */}
+            {recordingState === 'recording' && (
+              <p
+                className="text-sm text-center font-medium"
+                style={{ color: '#E03E2D' }}
+              >
+                🔴 Listening... (tap mic to stop, auto-stops in 4s)
+              </p>
+            )}
+
+            {/* Transcribing label */}
+            {recordingState === 'transcribing' && (
+              <p className="text-sm text-center" style={{ color: 'var(--steam-grey)' }}>
+                Barry is listening very hard...
+              </p>
+            )}
+
+            {/* "Barry heard" confirmation */}
+            {recordingState === 'heard' && barrysTranscript && (
+              <div
+                className="text-sm text-center rounded-lg px-4 py-2"
+                style={{
+                  background: 'rgba(224, 62, 45, 0.08)',
+                  color: 'var(--espresso)',
+                  border: '1px solid rgba(224, 62, 45, 0.2)',
+                }}
+              >
+                {transcriptDiffers ? (
+                  <>
+                    <span style={{ color: 'var(--steam-grey)' }}>You typed:</span>{' '}
+                    <strong>{name}</strong>
+                    {' '}
+                    <span style={{ color: 'var(--steam-grey)' }}>| Barry heard:</span>{' '}
+                    <strong style={{ color: '#E03E2D' }}>{barrysTranscript}</strong>
+                  </>
+                ) : (
+                  <>
+                    Barry heard: <strong style={{ color: '#E03E2D' }}>{barrysTranscript}</strong>
+                  </>
+                )}
+              </div>
+            )}
+
+            {/* Mic error */}
+            {micError && (
+              <p className="text-center text-xs" style={{ color: 'var(--steam-grey)' }}>
+                🎙️ {micError}
+              </p>
+            )}
+
             <button
               type="submit"
-              disabled={!name.trim()}
+              disabled={!name.trim() || recordingState === 'recording' || recordingState === 'transcribing'}
               className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 background: 'var(--espresso)',
@@ -260,6 +511,18 @@ export default function Home() {
 
       {/* Bottom spacer */}
       <div className="h-16" />
+
+      {/* Waveform animation keyframes */}
+      <style>{`
+        @keyframes waveBar {
+          from { transform: scaleY(0.4); }
+          to { transform: scaleY(1); }
+        }
+        @keyframes pulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(224, 62, 45, 0.4); }
+          50% { box-shadow: 0 0 0 8px rgba(224, 62, 45, 0); }
+        }
+      `}</style>
     </div>
   );
 }

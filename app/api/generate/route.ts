@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { generateMisspellings } from '@/lib/misspelling';
+import { generateMisspellings, VoiceMetadata } from '@/lib/misspelling';
 import { generateCupImage } from '@/lib/image-gen';
 import { getDb, ensureSchema } from '@/lib/db';
 
 export async function POST(req: NextRequest) {
   try {
-    const { name } = await req.json();
+    const body = await req.json();
+    const { name, voiceMetadata } = body as { name: string; voiceMetadata?: VoiceMetadata };
 
     if (!name || typeof name !== 'string') {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
@@ -18,8 +19,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 });
     }
 
-    // Step 1: Generate misspellings via GPT-4o-mini
-    const misspellingResult = await generateMisspellings(trimmedName);
+    // Step 1: Generate misspellings via GPT-4o-mini (with optional voice context)
+    const misspellingResult = await generateMisspellings(trimmedName, voiceMetadata);
     const primaryMisspelling = misspellingResult.options[0];
 
     // Step 2: Generate cup image via fal.ai FLUX.1 [schnell]
