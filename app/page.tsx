@@ -222,7 +222,9 @@ export default function Home() {
     if (!canonical) return;
     setLoading(true);
     setError('');
-    if (!muted) playWriting();
+    // Start audio and capture the promise — we'll wait for it to finish before navigating
+    // This ensures Barry's writing audio plays to completion, not cut off by navigation
+    const audioPromise = !muted ? playWriting() : Promise.resolve();
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -237,13 +239,15 @@ export default function Home() {
         throw new Error(data.error || 'Something went wrong');
       }
       const data = await res.json();
-      stopAll();
+      // Wait for Barry to finish his statement before navigating to result
+      // If audio already finished (fast API), this resolves immediately
+      await audioPromise;
       const resultUrl = data.fromCache
         ? `/result/${data.sessionId}?cached=1`
         : `/result/${data.sessionId}`;
       router.push(resultUrl);
     } catch (err) {
-      stopAll();
+      stopAll(); // Only stopAll on error
       setError(err instanceof Error ? err.message : 'Failed to generate your coffee name. Try again?');
       setLoading(false);
     }
