@@ -239,7 +239,7 @@ Do not use any other archetypes. Do not swap these out. Barry has already commit
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-haiku-4-5',
         max_tokens: 600,
         system: SYSTEM_PROMPT,
         messages: [
