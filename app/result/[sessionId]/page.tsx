@@ -72,14 +72,14 @@ export default function ResultPage({
     if (!session) return '';
     const orig = session.originalName;
     const mis = activeSpelling?.name || session.primaryMisspelling;
-    return `The barista heard "${orig}" and wrote "${mis}" ☕ What does your coffee cup say? baristar.app`;
+    return `The barista heard "${orig}" and wrote "${mis}" ☕ What does your coffee cup say? barrystarr.app`;
   }
 
   function getInstagramCaption() {
     if (!session) return '';
     const orig = session.originalName;
     const mis = activeSpelling?.name || session.primaryMisspelling;
-    return `My name is ${orig}. This is what the barista heard. ☕\n\nI can only assume the music was very loud.\n\n#Baristar #CoffeeName #TheyTried #${mis.replace(/\s/g, '')}`;
+    return `My name is ${orig}. This is what the barista heard. ☕\n\nI can only assume the music was very loud.\n\n#BarryStarr #CoffeeName #TheyTried #${mis.replace(/\s/g, '')}`;
   }
 
   function handleShareX() {

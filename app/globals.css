@@ -121,3 +121,51 @@ body {
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--cream); }
 ::-webkit-scrollbar-thumb { background: var(--caramel); border-radius: 3px; }
+
+/* ===== Mobile / PWA ===== */
+
+/* Prevent iOS text input zoom (font-size must be >=16px) */
+input[type="text"],
+input[type="email"],
+input[type="search"],
+textarea {
+  font-size: 16px !important;
+}
+
+/* Safe area padding for iPhone notch / Dynamic Island */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Touch targets — minimum 44×44px for all interactive elements */
+button, a {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Fix for very small inline buttons (e.g. dismiss ✕) */
+button.inline-btn {
+  min-height: unset;
+  min-width: unset;
+}
+
+/* Gallery grid: 1 col on mobile, 2 on sm, 3 on lg — already handled via Tailwind
+   but ensure images don't overflow on narrow viewports */
+.gallery-card img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Ensure the hero section is readable at 390px */
+@media (max-width: 430px) {
+  /* Slightly smaller hero text on phones */
+  .font-display {
+    line-height: 1.2;
+  }
+
+  /* Give the name input row room to breathe */
+  .relative.flex.items-center.gap-2 {
+    gap: 8px;
+  }
+}
+
