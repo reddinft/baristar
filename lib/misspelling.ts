@@ -193,7 +193,7 @@ export async function generateMisspellings(
   voiceMetadata?: VoiceMetadata,
   forcedArchetypes?: BarryArchetype[]
 ): Promise<MisspellingResult & { archetypes: BarryArchetype[]; fromCache: boolean }> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   // 1. Select archetypes
   const selectedArchetypes = forcedArchetypes ?? selectRandomArchetypes(3);
@@ -231,31 +231,31 @@ Do not use any other archetypes. Do not swap these out. Barry has already commit
   const voiceSection = voiceMetadata ? buildVoiceSection(voiceMetadata) : '';
 
   try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5.4',
+        model: 'claude-sonnet-4-5',
+        max_tokens: 600,
+        system: SYSTEM_PROMPT,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `${name}${archetypeInstruction}${voiceSection}` },
         ],
-        temperature: 1.1,
-        max_completion_tokens: 500,
       }),
     });
 
     if (!response.ok) {
-      console.error('OpenAI API error:', response.status, await response.text());
+      console.error('Anthropic API error:', response.status, await response.text());
       const fallback = getFallbackMisspellings(name);
       return { ...fallback, archetypes: selectedArchetypes, fromCache: false };
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const content = data.content?.[0]?.text;
 
     if (!content) {
       const fallback = getFallbackMisspellings(name);
