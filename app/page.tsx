@@ -201,7 +201,10 @@ export default function Home() {
         throw new Error(data.error || 'Something went wrong');
       }
       const data = await res.json();
-      router.push(`/result/${data.sessionId}`);
+      const resultUrl = data.fromCache
+        ? `/result/${data.sessionId}?cached=1`
+        : `/result/${data.sessionId}`;
+      router.push(resultUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate your coffee name. Try again?');
       setLoading(false);

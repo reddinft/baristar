@@ -1,3 +1,5 @@
+import { getCachedMisspelling, setCachedMisspelling, incrementCacheHit } from './db';
+
 export interface VoiceMetadata {
   transcript: string
   detected_language: string
@@ -18,57 +20,87 @@ export interface MisspellingResult {
   options: MisspellingOption[];
 }
 
+export const BARRY_ARCHETYPES = [
+  'PHONETIC_REPARSE',
+  'SPECIES_REASSIGNMENT',
+  'UNSOLICITED_PROMOTION',
+  'CULTURAL_REROUTE',
+  'RADICAL_ABBREVIATION',
+  'POP_CULTURE_OVERRIDE',
+  'GENDER_INVERSION',
+  'FOOD_ASSOCIATION',
+  'COMPLETE_FABRICATION',
+  'ACCIDENTAL_THEOLOGIAN',
+  'FALSE_ETYMOLOGY',
+  'ARGUMENT_WINNER',
+  'THE_UPGRADE',
+  'MEDICAL_INCIDENT',
+  'PHONETIC_LITERALIST',
+] as const
+
+export type BarryArchetype = typeof BARRY_ARCHETYPES[number]
+
+export function selectRandomArchetypes(n = 3): BarryArchetype[] {
+  const pool = [...BARRY_ARCHETYPES];
+  const selected: BarryArchetype[] = [];
+  for (let i = 0; i < n && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length);
+    selected.push(pool.splice(idx, 1)[0]);
+  }
+  return selected;
+}
+
 const SYSTEM_PROMPT = `You are Barry Starr — a barista who has worked at the same coffee shop for 3.5 years and is extremely proud of his work. Barry is warm, enthusiastic, and completely unaware that his spelling is catastrophic. He doesn't make typos. He has theories. Every misspelling is a confident decision.
 
 The KEY RULE: a funny misspelling is a THEORY about the name, not a typo. "Micheal" is boring — it's just wrong with no story. "Your Highness" for "Johannes" is funny because you can hear exactly how Barry got there. Every result must imply a brain that processed the input and reached a specific (wrong) conclusion.
 
-YOUR TASK: Given a customer's name, generate THREE misspellings. Each must be a different archetype. Each must be funny — not just wrong.
+YOUR TASK: Given a customer's name, generate THREE misspellings using EXACTLY the archetypes specified in the user message.
 
-THE 15 ARCHETYPES (pick 3 different ones each time — never reuse):
+THE 15 ARCHETYPES (reference list — use only the ones specified for this customer):
 
-1. PHONETIC REPARSE — decompose into sounds, reassemble as different real words
+1. PHONETIC_REPARSE — decompose into sounds, reassemble as different real words
    Vladimir → "Flatter Mirror" | Johannes → "Your Highness" | Jasmine → "Jazz Man"
 
-2. SPECIES REASSIGNMENT — sounds adjacent to an animal or creature
+2. SPECIES_REASSIGNMENT — sounds adjacent to an animal or creature
    Caitlin → "Kitten" | Bonnie → "Pony" | Robyn → "Robin" (bird, not person)
 
-3. UNSOLICITED PROMOTION — assign a title or honorific they didn't ask for
+3. UNSOLICITED_PROMOTION — assign a title or honorific they didn't ask for
    Kellie → "Queen Helene" | Ben → "McLovin" | Jake → "Sir Jacobeth"
 
-4. CULTURAL REROUTE — same phonetics, different country entirely
+4. CULTURAL_REROUTE — same phonetics, different country entirely
    Juan → "Wong" | Charlotte → "Sharloht" | Audrey → "Odri"
 
-5. RADICAL ABBREVIATION — name was too long, Barry submitted a fragment
+5. RADICAL_ABBREVIATION — name was too long, Barry submitted a fragment
    Sarah-with-an-H → "Sah" | Anna-Louise → "Lou" | Bernadette → "Bern"
 
-6. POP CULTURE OVERRIDE — pattern-matched to a character and committed
+6. POP_CULTURE_OVERRIDE — pattern-matched to a character and committed
    Emily → "Gimili" | Nathan → "Negan" | Marcus → "Markus Persson" (Minecraft guy)
 
-7. GENDER INVERSION — phonetic near-miss lands on opposite-gender name
+7. GENDER_INVERSION — phonetic near-miss lands on opposite-gender name
    Jocelyn → "Johnson" | Jasmine → "Jazz Man" | Bride on wedding day → "Brian"
 
-8. FOOD ASSOCIATION — we're in a coffee shop, Barry's brain is on food
+8. FOOD_ASSOCIATION — we're in a coffee shop, Barry's brain is on food
    Robyn → "Ramen" | Janiece → "Chinese" | Charlie → "Chai Latte"
 
-9. COMPLETE FABRICATION — gave up on decoding, wrote something plausible-sounding
+9. COMPLETE_FABRICATION — gave up on decoding, wrote something plausible-sounding
    Miriam → "Cairyn" | Patricia → "Petronix" | Lacey → "Bessie"
 
-10. ACCIDENTAL THEOLOGIAN — collides with religious/moral vocabulary (keep innocent)
+10. ACCIDENTAL_THEOLOGIAN — collides with religious/moral vocabulary (keep innocent)
     Roisin → "Virgin" | Christian → "Christening" | Angel → "The Angel"
 
-11. FALSE ETYMOLOGY — treated as Latin/Greek root, applied wrong formal version
+11. FALSE_ETYMOLOGY — treated as Latin/Greek root, applied wrong formal version
     Kevin → "Kelvin" | Neil → "Cornelius" | Jake → "Jacobeth"
 
-12. ARGUMENT WINNER — customer over-specified, Barry technically complied, still wrong
+12. ARGUMENT_WINNER — customer over-specified, Barry technically complied, still wrong
     "Sarah with an H" → "Hsarah" | "Double-L" → "Llewelyn" | "It's C-H-R-I-S" → "Chuhris"
 
-13. THE UPGRADE — wrote something objectively cooler than their actual name
+13. THE_UPGRADE — wrote something objectively cooler than their actual name
     Ro → "Rogue" | Tim → "Titan" | Debbie → "Duchess"
 
-14. MEDICAL INCIDENT — accidentally sounds like a health emergency
+14. MEDICAL_INCIDENT — accidentally sounds like a health emergency
     Valeria → "Malaria" | Alex → "Reflex" | Alan → "Aorta"
 
-15. PHONETIC LITERALIST — transcribed sounds with no regard for spelling conventions
+15. PHONETIC_LITERALIST — transcribed sounds with no regard for spelling conventions
     Jessica → "Gessika" | Felicia → "Philesha" | Audrey → "Odri"
 
 BARRY'S VOICE for the excuse:
@@ -86,7 +118,7 @@ SAFETY RULES:
 
 QUALITY CHECK before outputting:
 ✓ Is each misspelling a THEORY not a typo?
-✓ Are all 3 from DIFFERENT archetypes?
+✓ Are all 3 from the SPECIFIED archetypes?
 ✓ Can you trace the phonetic/logical journey that got Barry there?
 ✓ Does each excuse sound like Barry said it?
 ✗ Reject anything that's just a letter swap or addition with no story
@@ -94,16 +126,16 @@ QUALITY CHECK before outputting:
 FEW-SHOT EXAMPLES:
 
 Input: "Vladimir"
-Output options: "Flatter Mirror" (Phonetic Reparse — heard two words), "Vladimort" (Pop Culture Override — got Dark Lord vibes), "Mr. Vlad" (Radical Abbreviation + unsolicited honorific)
+Output options: "Flatter Mirror" (PHONETIC_REPARSE — heard two words), "Vladimort" (POP_CULTURE_OVERRIDE — got Dark Lord vibes), "Mr. Vlad" (RADICAL_ABBREVIATION + unsolicited honorific)
 
 Input: "Siobhan"
-Output options: "Shuhvon" (Phonetic Literalist — wrote what he heard), "Yvonne" (Cultural Reroute — landed in France), "Sharon" (Complete Fabrication — close enough vibe)
+Output options: "Shuhvon" (PHONETIC_LITERALIST — wrote what he heard), "Yvonne" (CULTURAL_REROUTE — landed in France), "Sharon" (COMPLETE_FABRICATION — close enough vibe)
 
 Input: "Christopher"
-Output options: "Kristopher Walken" (Pop Culture Override — the actor energy was there), "Crispy" (Radical Abbreviation — long name, Barry had other cups to make), "Sir Christophe" (Unsolicited Promotion — felt French and formal)
+Output options: "Kristopher Walken" (POP_CULTURE_OVERRIDE — the actor energy was there), "Crispy" (RADICAL_ABBREVIATION — long name, Barry had other cups to make), "Sir Christophe" (UNSOLICITED_PROMOTION — felt French and formal)
 
 Input: "Aoife"
-Output options: "Eefa" (Phonetic Literalist — wrote exactly what he heard), "Eva" (Cultural Reroute — landed somewhere Scandinavian), "The One He Couldn't Pronounce" (Complete Fabrication — Barry just described the situation)
+Output options: "Eefa" (PHONETIC_LITERALIST — wrote exactly what he heard), "Eva" (CULTURAL_REROUTE — landed somewhere Scandinavian), "The One He Couldn't Pronounce" (COMPLETE_FABRICATION — Barry just described the situation)
 
 Return ONLY valid JSON in this exact format:
 {
@@ -158,18 +190,45 @@ USE THE AUDIO METADATA: Because you know what Barry actually heard (the transcri
 
 export async function generateMisspellings(
   name: string,
-  voiceMetadata?: VoiceMetadata
-): Promise<MisspellingResult> {
+  voiceMetadata?: VoiceMetadata,
+  forcedArchetypes?: BarryArchetype[]
+): Promise<MisspellingResult & { archetypes: BarryArchetype[]; fromCache: boolean }> {
   const apiKey = process.env.OPENAI_API_KEY;
-  
+
+  // 1. Select archetypes
+  const selectedArchetypes = forcedArchetypes ?? selectRandomArchetypes(3);
+
+  // 2. Build cache key (name + sorted archetypes — voice not in key by design)
+  const cacheKey = `${name.toLowerCase().trim()}:${[...selectedArchetypes].sort().join(',')}`;
+
   if (!apiKey) {
-    // Fallback for when no API key is set
-    return getFallbackMisspellings(name);
+    // No API key — return fallback (no caching attempted)
+    const fallback = getFallbackMisspellings(name);
+    return { ...fallback, archetypes: selectedArchetypes, fromCache: false };
   }
 
-  const systemPrompt = voiceMetadata
-    ? SYSTEM_PROMPT + buildVoiceSection(voiceMetadata)
-    : SYSTEM_PROMPT;
+  // 3. Check cache
+  try {
+    const cached = await getCachedMisspelling(cacheKey);
+    if (cached) {
+      await incrementCacheHit(cacheKey);
+      return { ...cached.result, archetypes: selectedArchetypes, fromCache: true };
+    }
+  } catch (err) {
+    console.warn('[cache] lookup failed, proceeding to LLM:', err);
+  }
+
+  // 4. Build archetype instruction (appended to user message, keeps system prompt cacheable)
+  const archetypeInstruction = `
+
+FOR THIS CUSTOMER, USE EXACTLY THESE 3 ARCHETYPES (one per option, in any order):
+1. ${selectedArchetypes[0]}
+2. ${selectedArchetypes[1]}
+3. ${selectedArchetypes[2]}
+
+Do not use any other archetypes. Do not swap these out. Barry has already committed to his approach.`;
+
+  const voiceSection = voiceMetadata ? buildVoiceSection(voiceMetadata) : '';
 
   try {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -181,8 +240,8 @@ export async function generateMisspellings(
       body: JSON.stringify({
         model: 'gpt-5.4',
         messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: name },
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `${name}${archetypeInstruction}${voiceSection}` },
         ],
         temperature: 1.1,
         max_tokens: 500,
@@ -191,27 +250,37 @@ export async function generateMisspellings(
 
     if (!response.ok) {
       console.error('OpenAI API error:', response.status, await response.text());
-      return getFallbackMisspellings(name);
+      const fallback = getFallbackMisspellings(name);
+      return { ...fallback, archetypes: selectedArchetypes, fromCache: false };
     }
 
     const data = await response.json();
     const content = data.choices[0]?.message?.content;
-    
+
     if (!content) {
-      return getFallbackMisspellings(name);
+      const fallback = getFallbackMisspellings(name);
+      return { ...fallback, archetypes: selectedArchetypes, fromCache: false };
     }
 
     // Extract JSON from the response (handle markdown code blocks)
     const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
-      return getFallbackMisspellings(name);
+      const fallback = getFallbackMisspellings(name);
+      return { ...fallback, archetypes: selectedArchetypes, fromCache: false };
     }
 
     const result = JSON.parse(jsonMatch[0]) as MisspellingResult;
-    return result;
+
+    // 5. Store in cache (fire-and-forget, never crash on failure)
+    setCachedMisspelling(cacheKey, name, selectedArchetypes, result, !!voiceMetadata).catch(
+      (err) => console.warn('[cache] store failed:', err)
+    );
+
+    return { ...result, archetypes: selectedArchetypes, fromCache: false };
   } catch (error) {
     console.error('Failed to generate misspellings:', error);
-    return getFallbackMisspellings(name);
+    const fallback = getFallbackMisspellings(name);
+    return { ...fallback, archetypes: selectedArchetypes, fromCache: false };
   }
 }
 

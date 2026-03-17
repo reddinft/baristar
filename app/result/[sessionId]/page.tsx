@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, use } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface Misspelling {
   name: string;
@@ -28,6 +28,8 @@ export default function ResultPage({
 }) {
   const { sessionId } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromCache = searchParams.get('cached') === '1';
   const [session, setSession] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -183,6 +185,12 @@ export default function ResultPage({
           <p style={{ color: 'var(--steam-grey)' }}>
             Your name is <strong style={{ color: 'var(--espresso)' }}>{session.originalName}</strong>. They called you…
           </p>
+          {fromCache && (
+            <p className="text-xs mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-full"
+               style={{ background: 'var(--cream)', color: 'var(--steam-grey)', border: '1px solid #e0d5c5' }}>
+              ⚡ Barry had this one ready
+            </p>
+          )}
         </div>
 
         {/* Cup + name overlay */}

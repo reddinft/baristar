@@ -54,6 +54,8 @@ export async function POST(req: NextRequest) {
       imageUrl: imageResult.imageUrl,
       primaryMisspelling: primaryMisspelling.misspelling,
       originalName: trimmedName,
+      archetypes: misspellingResult.archetypes,
+      fromCache: misspellingResult.fromCache,
     });
 
   } catch (error) {
