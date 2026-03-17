@@ -244,7 +244,7 @@ Do not use any other archetypes. Do not swap these out. Barry has already commit
           { role: 'user', content: `${name}${archetypeInstruction}${voiceSection}` },
         ],
         temperature: 1.1,
-        max_tokens: 500,
+        max_completion_tokens: 500,
       }),
     });
 
