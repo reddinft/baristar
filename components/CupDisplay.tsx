@@ -9,50 +9,111 @@ interface CupDisplayProps {
   size?: 'sm' | 'md' | 'lg';
 }
 
+// Sleeve bounds as fraction of image dimensions
+// Based on FLUX cup prompt: sleeve is lower-centre of frame, main focus
+const SLEEVE = {
+  top: 0.50,     // sleeve starts at 50% down
+  bottom: 0.78,  // sleeve ends at 78% down
+  left: 0.13,    // sleeve left edge at 13% from left
+  right: 0.87,   // sleeve right edge at 87%
+};
+
+function getSleeveStyle(containerPx: number) {
+  return {
+    top: `${SLEEVE.top * 100}%`,
+    left: `${SLEEVE.left * 100}%`,
+    width: `${(SLEEVE.right - SLEEVE.left) * 100}%`,
+    height: `${(SLEEVE.bottom - SLEEVE.top) * 100}%`,
+  };
+}
+
+// Break a name into lines that fit within maxCharsPerLine
+// Prefers breaking on spaces; falls back to hyphenating long words
+function breakName(name: string, maxCharsPerLine: number): string[] {
+  const words = name.split(' ');
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    if (word.length > maxCharsPerLine) {
+      // Long single word — hyphenate
+      if (current) { lines.push(current); current = ''; }
+      let remaining = word;
+      while (remaining.length > maxCharsPerLine) {
+        lines.push(remaining.slice(0, maxCharsPerLine - 1) + '-');
+        remaining = remaining.slice(maxCharsPerLine - 1);
+      }
+      current = remaining;
+    } else if ((current + (current ? ' ' : '') + word).length <= maxCharsPerLine) {
+      current = current ? `${current} ${word}` : word;
+    } else {
+      if (current) lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+// Calculate font size and lines to fit within sleeve
+function fitNameToSleeve(name: string, sleeveWidthPx: number, sleeveHeightPx: number) {
+  // Try font sizes from large to small
+  // Each char in Permanent Marker is ~0.62em wide on average
+  const CHAR_WIDTH_RATIO = 0.62;
+  const LINE_HEIGHT_RATIO = 1.25; // em
+  const MAX_LINES = 3;
+
+  for (let fontSize = 32; fontSize >= 10; fontSize -= 1) {
+    const charWidth = fontSize * CHAR_WIDTH_RATIO;
+    const lineHeight = fontSize * LINE_HEIGHT_RATIO;
+    const maxCharsPerLine = Math.floor(sleeveWidthPx / charWidth);
+    const lines = breakName(name, maxCharsPerLine);
+    const totalHeight = lines.length * lineHeight;
+
+    if (lines.length <= MAX_LINES && totalHeight <= sleeveHeightPx * 0.85) {
+      return { fontSize, lines };
+    }
+  }
+
+  // Last resort: tiny font, force single line truncated
+  const lines = [name.slice(0, 18) + (name.length > 18 ? '…' : '')];
+  return { fontSize: 10, lines };
+}
+
 export function CupDisplay({ imageUrl, misspelledName, size = 'md' }: CupDisplayProps) {
+  const sizeMap = { sm: 160, md: 256, lg: 320 };
+  const containerPx = sizeMap[size];
+
   const rotation = useMemo(() => {
-    // Deterministic rotation based on name so it's stable across renders
     const hash = misspelledName.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-    const deg = ((hash % 5) - 2); // -2 to +2 degrees
-    return deg;
+    return ((hash % 5) - 2); // -2 to +2 degrees
   }, [misspelledName]);
 
-  const sizeClasses = {
-    sm: 'w-40 h-40',
-    md: 'w-64 h-64',
-    lg: 'w-80 h-80',
-  };
+  const sleeveStyle = getSleeveStyle(containerPx);
+  const sleeveWidthPx = (SLEEVE.right - SLEEVE.left) * containerPx;
+  const sleeveHeightPx = (SLEEVE.bottom - SLEEVE.top) * containerPx;
 
-  const fontSize = useMemo(() => {
-    const len = misspelledName.length;
-    const base = { sm: [18, 14, 11, 9], md: [28, 22, 17, 13], lg: [34, 27, 21, 16] };
-    const tiers = base[size];
-    if (len <= 8)  return `${tiers[0]}px`;
-    if (len <= 14) return `${tiers[1]}px`;
-    if (len <= 22) return `${tiers[2]}px`;
-    return `${tiers[3]}px`;
-  }, [misspelledName, size]);
+  const { fontSize, lines } = useMemo(
+    () => fitNameToSleeve(misspelledName, sleeveWidthPx, sleeveHeightPx),
+    [misspelledName, sleeveWidthPx, sleeveHeightPx]
+  );
 
   const isPlaceholder = imageUrl === '/placeholder-cup.svg' || !imageUrl;
 
   return (
-    <div className={`cup-card relative ${sizeClasses[size]} flex items-center justify-center overflow-hidden`}>
+    <div
+      className="cup-card relative flex-shrink-0"
+      style={{ width: containerPx, height: containerPx, overflow: 'hidden' }}
+    >
       {isPlaceholder ? (
         <div className="w-full h-full flex items-center justify-center bg-amber-50">
-          {/* Fallback: styled text cup */}
-          <div className="relative flex flex-col items-center">
-            <svg viewBox="0 0 200 220" className="w-full h-full absolute inset-0" xmlns="http://www.w3.org/2000/svg">
-              {/* Cup body */}
-              <path d="M55 60 L68 180 L132 180 L145 60 Z" fill="#e8d5b5" stroke="#c4a882" strokeWidth="1.5"/>
-              {/* Sleeve */}
-              <rect x="50" y="100" width="100" height="50" rx="3" fill="#c8a96e"/>
-              {/* Sleeve label area */}
-              <rect x="56" y="106" width="88" height="38" rx="2" fill="#f0e6d0"/>
-              {/* Lid */}
-              <rect x="48" y="52" width="104" height="12" rx="6" fill="#8b6914"/>
-              <rect x="76" y="46" width="48" height="10" rx="5" fill="#7a5e12"/>
-            </svg>
-          </div>
+          <svg viewBox="0 0 200 220" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <path d="M55 60 L68 180 L132 180 L145 60 Z" fill="#e8d5b5" stroke="#c4a882" strokeWidth="1.5"/>
+            <rect x="50" y="100" width="100" height="50" rx="3" fill="#c8a96e"/>
+            <rect x="56" y="106" width="88" height="38" rx="2" fill="#f0e6d0"/>
+            <rect x="48" y="52" width="104" height="12" rx="6" fill="#8b6914"/>
+            <rect x="76" y="46" width="48" height="10" rx="5" fill="#7a5e12"/>
+          </svg>
         </div>
       ) : (
         <Image
@@ -64,29 +125,30 @@ export function CupDisplay({ imageUrl, misspelledName, size = 'md' }: CupDisplay
         />
       )}
 
-      {/* CSS name overlay — always rendered on top */}
+      {/* Name overlay — positioned over the sleeve, not centred on whole image */}
       <div
-        className="absolute inset-0 flex items-center justify-center pointer-events-none"
-        style={{ paddingTop: isPlaceholder ? '10px' : '0' }}
+        className="absolute pointer-events-none flex items-center justify-center"
+        style={{
+          ...sleeveStyle,
+          transform: `rotate(${rotation}deg)`,
+          transformOrigin: 'center center',
+        }}
       >
-        <span
-          className="cup-name-overlay font-marker text-center px-2 leading-tight"
+        <div
           style={{
-            fontSize: fontSize,
-            transform: `rotate(${rotation}deg)`,
-            color: '#1a1a1a',
-            textShadow: '1px 1px 0 rgba(255,255,255,0.3)',
-            maxWidth: '78%',
-            width: '78%',
-            wordBreak: 'break-word',
-            whiteSpace: 'normal',
-            overflowWrap: 'break-word',
-            display: 'block',
+            fontFamily: "'Permanent Marker', cursive",
+            fontSize: `${fontSize}px`,
             lineHeight: '1.2',
+            color: '#1a1a1a',
+            textShadow: '0px 1px 2px rgba(255,255,255,0.45)',
+            textAlign: 'center',
+            whiteSpace: 'pre-line',
+            maxWidth: '100%',
+            padding: '0 4px',
           }}
         >
-          {misspelledName}
-        </span>
+          {lines.join('\n')}
+        </div>
       </div>
     </div>
   );

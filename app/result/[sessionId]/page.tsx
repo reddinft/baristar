@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, use } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { CupDisplay } from '@/components/CupDisplay';
 
 interface Misspelling {
   name: string;
@@ -19,8 +20,6 @@ interface SessionData {
   createdAt: number;
 }
 
-const RANDOM_ROTATIONS = [-4, -2, 0, 2, 3, -3, 1, -1];
-
 export default function ResultPage({
   params,
 }: {
@@ -34,9 +33,6 @@ export default function ResultPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
-  const [rotation] = useState(
-    () => RANDOM_ROTATIONS[Math.floor(Math.random() * RANDOM_ROTATIONS.length)]
-  );
 
   // Upload state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -194,53 +190,11 @@ export default function ResultPage({
         </div>
 
         {/* Cup + name overlay */}
-        <div className="cup-card w-64 h-64 flex-shrink-0">
-          {session.imageUrl ? (
-            <div className="relative inline-block w-64 h-64">
-              <img
-                src={session.imageUrl}
-                alt="Your coffee cup"
-                className="w-64 h-64 rounded-xl object-cover"
-              />
-              <div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ transform: `rotate(${rotation}deg)` }}
-              >
-                <span
-                  className="text-2xl font-bold"
-                  style={{
-                    fontFamily: "'Permanent Marker', cursive",
-                    color: '#1a1a1a',
-                    textShadow: '1px 1px 2px rgba(255,255,255,0.6)',
-                  }}
-                >
-                  {activeSpelling?.name}
-                </span>
-              </div>
-            </div>
-          ) : (
-            /* Fallback: no image */
-            <div
-              className="w-64 h-64 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--cream)' }}
-            >
-              <div className="text-center p-6">
-                <div className="text-6xl mb-2">☕</div>
-                <span
-                  style={{
-                    fontFamily: "'Permanent Marker', cursive",
-                    fontSize: '1.5rem',
-                    color: '#1a1a1a',
-                    transform: `rotate(${rotation}deg)`,
-                    display: 'inline-block',
-                  }}
-                >
-                  {activeSpelling?.name}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+        <CupDisplay
+          imageUrl={session.imageUrl || '/placeholder-cup.svg'}
+          misspelledName={activeSpelling?.name || session.primaryMisspelling}
+          size="md"
+        />
 
         {/* Big name display */}
         <div className="text-center">
@@ -249,7 +203,7 @@ export default function ResultPage({
             style={{
               fontFamily: "'Permanent Marker', cursive",
               color: 'var(--espresso)',
-              transform: `rotate(${rotation * 0.5}deg)`,
+              transform: `rotate(-1deg)`,
               display: 'inline-block',
             }}
           >
