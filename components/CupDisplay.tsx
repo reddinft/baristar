@@ -23,11 +23,15 @@ export function CupDisplay({ imageUrl, misspelledName, size = 'md' }: CupDisplay
     lg: 'w-80 h-80',
   };
 
-  const fontSizes = {
-    sm: misspelledName.length > 8 ? '14px' : '18px',
-    md: misspelledName.length > 8 ? '20px' : '28px',
-    lg: misspelledName.length > 8 ? '24px' : '34px',
-  };
+  const fontSize = useMemo(() => {
+    const len = misspelledName.length;
+    const base = { sm: [18, 14, 11, 9], md: [28, 22, 17, 13], lg: [34, 27, 21, 16] };
+    const tiers = base[size];
+    if (len <= 8)  return `${tiers[0]}px`;
+    if (len <= 14) return `${tiers[1]}px`;
+    if (len <= 22) return `${tiers[2]}px`;
+    return `${tiers[3]}px`;
+  }, [misspelledName, size]);
 
   const isPlaceholder = imageUrl === '/placeholder-cup.svg' || !imageUrl;
 
@@ -68,12 +72,17 @@ export function CupDisplay({ imageUrl, misspelledName, size = 'md' }: CupDisplay
         <span
           className="cup-name-overlay font-marker text-center px-2 leading-tight"
           style={{
-            fontSize: fontSizes[size],
+            fontSize: fontSize,
             transform: `rotate(${rotation}deg)`,
             color: '#1a1a1a',
             textShadow: '1px 1px 0 rgba(255,255,255,0.3)',
-            maxWidth: '90%',
+            maxWidth: '78%',
+            width: '78%',
             wordBreak: 'break-word',
+            whiteSpace: 'normal',
+            overflowWrap: 'break-word',
+            display: 'block',
+            lineHeight: '1.2',
           }}
         >
           {misspelledName}
