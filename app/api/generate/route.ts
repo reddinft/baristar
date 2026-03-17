@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
-import { generateMisspellings, VoiceMetadata } from '@/lib/misspelling';
+import { generateMisspellings, VoiceMetadata, detectCorrection } from '@/lib/misspelling';
 import { generateCupImage } from '@/lib/image-gen';
 import { getDb, ensureSchema } from '@/lib/db';
 
@@ -19,8 +19,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name cannot be empty' }, { status: 400 });
     }
 
+    // Detect correction hints (e.g. "Marc with a C", "Sarah with an H")
+    const correctionHint = detectCorrection(trimmedName);
+    // Use base name for storage if correction detected (store "Marc" not "Marc with a C")
+    const nameForStorage = correctionHint.hasCorrection ? correctionHint.baseName : trimmedName;
+
     // Step 1: Generate misspellings via GPT-4o-mini (with optional voice context)
-    const misspellingResult = await generateMisspellings(trimmedName, voiceMetadata);
+    const misspellingResult = await generateMisspellings(trimmedName, voiceMetadata, undefined, correctionHint);
     const primaryMisspelling = misspellingResult.options[0];
 
     // Step 2: Generate cup image via fal.ai FLUX.1 [schnell]
@@ -36,7 +41,7 @@ export async function POST(req: NextRequest) {
             VALUES (?, ?, ?, ?, ?)`,
       args: [
         sessionId,
-        trimmedName,
+        nameForStorage,
         primaryMisspelling.misspelling,
         JSON.stringify(misspellingResult.options),
         imageResult.imageUrl,
@@ -53,7 +58,8 @@ export async function POST(req: NextRequest) {
       })),
       imageUrl: imageResult.imageUrl,
       primaryMisspelling: primaryMisspelling.misspelling,
-      originalName: trimmedName,
+      originalName: nameForStorage,
+      correctionUsed: correctionHint.hasCorrection ? correctionHint.correctionText : null,
       archetypes: misspellingResult.archetypes,
       fromCache: misspellingResult.fromCache,
     });

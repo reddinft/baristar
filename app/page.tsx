@@ -361,7 +361,7 @@ export default function Home() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Your actual name (we'll ruin it beautifully)"
+                placeholder="Your name — try 'Marc with a C' or 'Sarah with an H'"
                 maxLength={50}
                 className="flex-1 px-5 py-4 text-lg rounded-xl border-2 outline-none transition-all"
                 style={{

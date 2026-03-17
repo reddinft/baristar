@@ -1,5 +1,63 @@
 import { getCachedMisspelling, setCachedMisspelling, incrementCacheHit } from './db';
 
+export interface CorrectionHint {
+  hasCorrection: boolean;
+  baseName: string;          // e.g. "Marc"
+  correctionText: string;    // e.g. "with a C"
+  correctionType: 'letter_spec' | 'spelling_variant' | 'spelled_out' | 'double_letter' | 'not_variant' | 'other'
+}
+
+export function detectCorrection(input: string): CorrectionHint {
+  const trimmed = input.trim();
+
+  // "Marc with a C" / "Sarah with an H"
+  const withLetter = trimmed.match(/^([A-Za-z\s'-]+?)\s+with\s+an?\s+([A-Za-z])\b/i);
+  if (withLetter) return {
+    hasCorrection: true,
+    baseName: withLetter[1].trim(),
+    correctionText: `with a ${withLetter[2].toUpperCase()}`,
+    correctionType: 'letter_spec'
+  };
+
+  // "It's Chris not Kris" / "Emma not Ema"
+  const notVariant = trimmed.match(/^(?:it'?s?\s+)?([A-Za-z\s'-]+?)\s+not\s+([A-Za-z\s'-]+)$/i);
+  if (notVariant) return {
+    hasCorrection: true,
+    baseName: notVariant[1].trim(),
+    correctionText: `not ${notVariant[2].trim()}`,
+    correctionType: 'not_variant'
+  };
+
+  // "Lauren double-L" / "Lauren with a double L"
+  const doubleL = trimmed.match(/^([A-Za-z\s'-]+?)\s+(?:with\s+a?\s+)?double[- ]?([A-Za-z])\b/i);
+  if (doubleL) return {
+    hasCorrection: true,
+    baseName: doubleL[1].trim(),
+    correctionText: `double-${doubleL[2].toUpperCase()}`,
+    correctionType: 'double_letter'
+  };
+
+  // "spelled K-A-T-I-E" / "it's K-A-T-I-E"
+  const spelledOut = trimmed.match(/^([A-Za-z\s'-]+?)\s*[,\s]+(?:spelled?\s+)?([A-Z](?:-[A-Z]){2,})\s*$/i);
+  if (spelledOut) return {
+    hasCorrection: true,
+    baseName: spelledOut[1].trim(),
+    correctionText: `spelled ${spelledOut[2].toUpperCase()}`,
+    correctionType: 'spelled_out'
+  };
+
+  // "Kathryn with a Y" / variant spellings: "Kaitlyn not Caitlin"
+  const spellingVariant = trimmed.match(/^([A-Za-z\s'-]+?)\s+(?:with\s+a?\s+)?([A-Za-z]+)\s+(?:spelling|version)\b/i);
+  if (spellingVariant) return {
+    hasCorrection: true,
+    baseName: spellingVariant[1].trim(),
+    correctionText: spellingVariant[2].trim(),
+    correctionType: 'spelling_variant'
+  };
+
+  return { hasCorrection: false, baseName: trimmed, correctionText: '', correctionType: 'other' };
+}
+
 export interface VoiceMetadata {
   transcript: string
   detected_language: string
@@ -163,6 +221,24 @@ Output options: "Alfredo" (FOOD_ASSOCIATION — Barry's brain autocompleted to t
 Input: "Nissan"
 Output options: "Nisson" (PHONETIC_REPARSE — heard 'Nis-awn', committed to it), "Titan" (THE_UPGRADE — Barry decided Nissan sounded too much like a car brand and upgraded it), "Nissander" (GENDER_INVERSION — heard strong masculine energy, added the classical suffix)
 
+CORRECTION-AWARE GENERATION:
+When the customer gave Barry a spelling correction, this is GOLD. Barry heard the correction and did exactly the wrong thing with it. This ALWAYS uses ARGUMENT_WINNER as one of the three archetypes.
+
+Examples of correction-based misspellings:
+- "Marc with a C" → "Cark" (took the C instruction, put it first — the C was clearly the important part)
+- "Sarah with an H" → "Hsarah" (H seemed prominent, moved it to front)
+- "Lauren, double-L" → "Llaurenn" (doubled both the L AND the N, felt thorough)
+- "It's Emma not Ema" → "Ema" (Barry chose the exact wrong one, with confidence)
+- "spelled K-A-T-I-E" → "K-A-T-I-E" (Barry wrote it down letter-by-letter, including the dashes)
+- "It's Chris with a K" → "Khris" (honoured the K, kept the h, still wrong)
+- "Jeff, not Geoff" → "Geoff" (went with the one they explicitly didn't want)
+
+Barry's excuse for correction-based misspellings should reference the correction specifically:
+- "You said 'with a C' so I made sure the C was prominent."
+- "They were very specific about the H. I honoured that."
+- "You said double-L. I went with double everything."
+- "You mentioned Ema. Sounded more you."
+
 VALIDATION (mandatory before outputting):
 ✓ None of the 3 misspellings is the correct original spelling
 ✓ Each misspelling maps to something recognisable — a real word, name, reference, or concept
@@ -223,15 +299,21 @@ USE THE AUDIO METADATA: Because you know what Barry actually heard (the transcri
 export async function generateMisspellings(
   name: string,
   voiceMetadata?: VoiceMetadata,
-  forcedArchetypes?: BarryArchetype[]
+  forcedArchetypes?: BarryArchetype[],
+  correctionHint?: CorrectionHint
 ): Promise<MisspellingResult & { archetypes: BarryArchetype[]; fromCache: boolean }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   // 1. Select archetypes
-  const selectedArchetypes = forcedArchetypes ?? selectRandomArchetypes(3);
+  let selectedArchetypes = forcedArchetypes ?? selectRandomArchetypes(3);
 
-  // 2. Build cache key (name + sorted archetypes — voice not in key by design)
-  const cacheKey = `${name.toLowerCase().trim()}:${[...selectedArchetypes].sort().join(',')}`;
+  // If correction detected, force ARGUMENT_WINNER as one archetype
+  if (correctionHint?.hasCorrection && !selectedArchetypes.includes('ARGUMENT_WINNER')) {
+    selectedArchetypes[0] = 'ARGUMENT_WINNER'; // replace first slot
+  }
+
+  // 2. Build cache key (name + sorted archetypes + correction flag — voice not in key by design)
+  const cacheKey = `${name.toLowerCase().trim()}:${[...selectedArchetypes].sort().join(',')}${correctionHint?.hasCorrection ? ':corrected' : ''}`;
 
   if (!apiKey) {
     // No API key — return fallback (no caching attempted)
@@ -262,6 +344,16 @@ Do not use any other archetypes. Do not swap these out. Barry has already commit
 
   const voiceSection = voiceMetadata ? buildVoiceSection(voiceMetadata) : '';
 
+  const correctionSection = correctionHint?.hasCorrection ? `
+
+CORRECTION CONTEXT:
+The customer said: "${name}"
+Their base name is: "${correctionHint.baseName}"
+Their correction was: "${correctionHint.correctionText}"
+Barry heard the correction. Barry processed the correction. Barry used the correction incorrectly.
+For the ARGUMENT_WINNER misspelling especially: use the correction as the raw material for the joke.
+The ARGUMENT_WINNER should reference what they said (the ${correctionHint.correctionType} correction) in Barry's excuse.` : '';
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -275,7 +367,7 @@ Do not use any other archetypes. Do not swap these out. Barry has already commit
         max_tokens: 600,
         system: SYSTEM_PROMPT,
         messages: [
-          { role: 'user', content: `${name}${archetypeInstruction}${voiceSection}` },
+          { role: 'user', content: `${name}${archetypeInstruction}${correctionSection}${voiceSection}` },
         ],
       }),
     });
