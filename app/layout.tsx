@@ -56,13 +56,14 @@ export default function RootLayout({
               className="font-display font-bold text-xl"
               style={{ color: 'var(--espresso)' }}
             >
-              Baristar
+              Barry Starr
             </span>
+            <span className="text-lg" aria-label="Barry's star signature">⭐</span>
           </a>
           <a
             href="/gallery"
             className="text-sm font-medium transition-colors hover:text-amber-700"
-            style={{ color: 'var(--steam-grey)' }}
+            style={{ color: 'var(--cold-brew)' }}
           >
             Wall of Shame →
           </a>
@@ -71,15 +72,13 @@ export default function RootLayout({
         <footer
           className="w-full py-8 text-center text-xs mt-16"
           style={{
-            color: 'var(--steam-grey)',
+            color: 'var(--cold-brew)',
             paddingBottom: 'max(env(safe-area-inset-bottom), 2rem)',
           }}
         >
           <p>
-            ☕ Made with love and poor penmanship.{' '}
-            <span className="opacity-60">
-              Starbucks built an empire on misspelled cups. We&apos;re just making it official.
-            </span>
+            Made with love, a Sharpie, and no regard for spelling.{' '}
+            <span className="opacity-60">· barrystarr.app</span>
           </p>
         </footer>
         <InstallPrompt />

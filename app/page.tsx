@@ -130,7 +130,7 @@ export default function Home() {
     setBarrysTranscript('');
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setMicError('Barry needs to hear your name — your browser doesn\'t support microphone access.');
+      setMicError("Barry needs to hear your name — your browser doesn't support microphone access.");
       return;
     }
 
@@ -169,7 +169,7 @@ export default function Home() {
         stopRecording();
       }, 4000);
     } catch {
-      setMicError('Barry needs to hear your name — allow microphone access');
+      setMicError("Barry needs to hear your name — allow microphone access");
       setRecordingState('idle');
     }
   }, [transcribeAudio, stopRecording]);
@@ -230,16 +230,19 @@ export default function Home() {
           <span className="text-6xl">☕</span>
         </div>
         <h1
-          className="font-display text-5xl md:text-6xl font-bold mb-4 leading-tight"
+          className="font-display font-bold mb-4 leading-tight"
           style={{ color: 'var(--espresso)' }}
         >
-          What did they call you?
+          <span className="block text-5xl md:text-6xl">Hi, I&apos;m Barry Starr.</span>
+          <span className="block text-3xl md:text-4xl mt-2" style={{ color: 'var(--cold-brew)' }}>
+            I&apos;ll be your barista today.
+          </span>
         </h1>
-        <p className="text-lg md:text-xl mb-2" style={{ color: 'var(--steam-grey)' }}>
-          You gave them one name. They gave it their best shot.
+        <p className="text-lg md:text-xl mb-2" style={{ color: 'var(--cold-brew)' }}>
+          Tell me your name. I&apos;ll write it on your cup.
         </p>
-        <p className="text-sm" style={{ color: 'var(--steam-grey)' }}>
-          See what a barista would write on your cup — powered by AI and a deep misunderstanding of vowels.
+        <p className="text-sm italic" style={{ color: 'var(--cold-brew)', opacity: 0.8 }}>
+          (Results may vary. Actually, results will definitely vary.)
         </p>
       </section>
 
@@ -257,13 +260,13 @@ export default function Home() {
                 maxLength={50}
                 className="flex-1 px-5 py-4 text-lg rounded-xl border-2 outline-none transition-all"
                 style={{
-                  borderColor: 'var(--caramel)',
-                  background: 'white',
-                  color: 'var(--dark-roast)',
+                  borderColor: 'var(--worn-leather)',
+                  background: 'var(--chalk-white)',
+                  color: 'var(--espresso)',
                   fontFamily: 'Inter, sans-serif',
                 }}
                 onFocus={(e) => {
-                  e.target.style.boxShadow = '0 0 0 3px rgba(212, 134, 11, 0.2)';
+                  e.target.style.boxShadow = '0 0 0 3px rgba(139, 90, 43, 0.2)';
                 }}
                 onBlur={(e) => {
                   e.target.style.boxShadow = 'none';
@@ -281,19 +284,26 @@ export default function Home() {
                     ? 'Click to stop'
                     : recordingState === 'transcribing'
                     ? 'Transcribing...'
-                    : 'Say your name'
+                    : "Or speak it — Barry's listening"
+                }
+                aria-label={
+                  recordingState === 'recording'
+                    ? 'Click to stop'
+                    : recordingState === 'transcribing'
+                    ? 'Transcribing...'
+                    : "Or speak it — Barry's listening"
                 }
                 className="flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center transition-all border-2"
                 style={{
                   background:
-                    recordingState === 'recording' ? '#E03E2D' : 'white',
+                    recordingState === 'recording' ? 'var(--barry-red)' : 'var(--chalk-white)',
                   borderColor:
-                    recordingState === 'recording' ? '#E03E2D' : 'var(--caramel)',
+                    recordingState === 'recording' ? 'var(--barry-red)' : 'var(--worn-leather)',
                   color:
                     recordingState === 'recording'
                       ? 'white'
                       : recordingState === 'transcribing'
-                      ? 'var(--caramel)'
+                      ? 'var(--worn-leather)'
                       : 'var(--espresso)',
                   animation:
                     recordingState === 'recording' ? 'pulse 1s infinite' : 'none',
@@ -334,7 +344,7 @@ export default function Home() {
             {recordingState === 'recording' && (
               <p
                 className="text-sm text-center font-medium"
-                style={{ color: '#E03E2D' }}
+                style={{ color: 'var(--barry-red)' }}
               >
                 🔴 Listening... (tap mic to stop, auto-stops in 4s)
               </p>
@@ -342,7 +352,7 @@ export default function Home() {
 
             {/* Transcribing label */}
             {recordingState === 'transcribing' && (
-              <p className="text-sm text-center" style={{ color: 'var(--steam-grey)' }}>
+              <p className="text-sm text-center" style={{ color: 'var(--cold-brew)' }}>
                 Barry is listening very hard...
               </p>
             )}
@@ -359,15 +369,15 @@ export default function Home() {
               >
                 {transcriptDiffers ? (
                   <>
-                    <span style={{ color: 'var(--steam-grey)' }}>You typed:</span>{' '}
+                    <span style={{ color: 'var(--cold-brew)' }}>You typed:</span>{' '}
                     <strong>{name}</strong>
                     {' '}
-                    <span style={{ color: 'var(--steam-grey)' }}>| Barry heard:</span>{' '}
-                    <strong style={{ color: '#E03E2D' }}>{barrysTranscript}</strong>
+                    <span style={{ color: 'var(--cold-brew)' }}>| Barry heard:</span>{' '}
+                    <strong style={{ color: 'var(--barry-red)' }}>{barrysTranscript}</strong>
                   </>
                 ) : (
                   <>
-                    Barry heard: <strong style={{ color: '#E03E2D' }}>{barrysTranscript}</strong>
+                    Barry heard: <strong style={{ color: 'var(--barry-red)' }}>{barrysTranscript}</strong>
                   </>
                 )}
               </div>
@@ -375,7 +385,7 @@ export default function Home() {
 
             {/* Mic error */}
             {micError && (
-              <p className="text-center text-xs" style={{ color: 'var(--steam-grey)' }}>
+              <p className="text-center text-xs" style={{ color: 'var(--cold-brew)' }}>
                 🎙️ {micError}
               </p>
             )}
@@ -385,24 +395,24 @@ export default function Home() {
               disabled={!name.trim() || recordingState === 'recording' || recordingState === 'transcribing'}
               className="w-full py-4 px-6 rounded-xl text-lg font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: 'var(--espresso)',
-                color: 'var(--warm-white)',
+                background: 'var(--barry-red)',
+                color: 'white',
               }}
               onMouseEnter={(e) => {
-                if (name.trim()) (e.target as HTMLElement).style.opacity = '0.85';
+                if (name.trim()) (e.target as HTMLElement).style.background = '#c9362a';
               }}
               onMouseLeave={(e) => {
-                (e.target as HTMLElement).style.opacity = '1';
+                (e.target as HTMLElement).style.background = 'var(--barry-red)';
               }}
             >
-              ☕ Make My Cup
+              ☕ Give Barry my name
             </button>
             {error && (
-              <p className="text-center text-sm" style={{ color: 'var(--raspberry)' }}>
+              <p className="text-center text-sm" style={{ color: 'var(--barry-red)' }}>
                 {error}
               </p>
             )}
-            <p className="text-center text-xs" style={{ color: 'var(--steam-grey)' }}>
+            <p className="text-center text-xs" style={{ color: 'var(--cold-brew)' }}>
               No sign-up. No email. Just your name, mangled with love.
             </p>
           </form>
@@ -423,11 +433,11 @@ export default function Home() {
               className="text-base font-medium text-center"
               style={{ color: 'var(--espresso)' }}
             >
-              Our barista is concentrating very, very hard...
+              Barry is writing very carefully...
             </p>
             <p
               className="text-sm italic text-center max-w-xs transition-all duration-500"
-              style={{ color: 'var(--steam-grey)' }}
+              style={{ color: 'var(--cold-brew)' }}
             >
               &ldquo;{LOADING_MESSAGES[loadingMsgIndex]}&rdquo;
             </p>
@@ -437,7 +447,7 @@ export default function Home() {
                   key={i}
                   className="w-2 h-2 rounded-full animate-bounce"
                   style={{
-                    background: 'var(--caramel)',
+                    background: 'var(--worn-leather)',
                     animationDelay: `${i * 0.15}s`,
                   }}
                 />
@@ -455,9 +465,9 @@ export default function Home() {
               className="font-display text-3xl font-bold mb-2"
               style={{ color: 'var(--espresso)' }}
             >
-              The Wall of Shame
+              The Wall of Shame ⭐
             </h2>
-            <p style={{ color: 'var(--steam-grey)' }}>
+            <p style={{ color: 'var(--cold-brew)' }}>
               Real cups. Real misunderstandings. Real baristas who did their best.
             </p>
           </div>
@@ -485,12 +495,12 @@ export default function Home() {
                 </div>
                 <p className="text-sm font-medium" style={{ color: 'var(--espresso)' }}>
                   {item.original_name} →{' '}
-                  <span className="font-marker" style={{ color: 'var(--caramel)' }}>
+                  <span className="font-marker" style={{ color: 'var(--worn-leather)' }}>
                     {item.misspelled_name}
                   </span>
                 </p>
                 {item.caption && (
-                  <p className="text-xs mt-1" style={{ color: 'var(--steam-grey)' }}>
+                  <p className="text-xs mt-1" style={{ color: 'var(--cold-brew)' }}>
                     {item.caption}
                   </p>
                 )}
@@ -502,8 +512,8 @@ export default function Home() {
               href="/gallery"
               className="inline-block px-6 py-3 rounded-xl text-sm font-medium border-2 transition-all"
               style={{
-                borderColor: 'var(--caramel)',
-                color: 'var(--caramel)',
+                borderColor: 'var(--worn-leather)',
+                color: 'var(--worn-leather)',
               }}
             >
               See all submissions →

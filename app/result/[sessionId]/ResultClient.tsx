@@ -25,6 +25,39 @@ interface ResultClientProps {
   session: SessionData;
 }
 
+/** Levenshtein distance — measures how different two strings are */
+function levenshtein(a: string, b: string): number {
+  const m = a.length;
+  const n = b.length;
+  const dp: number[][] = Array.from({ length: m + 1 }, (_, i) =>
+    Array.from({ length: n + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0))
+  );
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] =
+        a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+    }
+  }
+  return dp[m][n];
+}
+
+/** Returns 'mild' | 'medium' | 'severe' based on edit distance vs name length */
+function misspellingGap(original: string, misspelled: string): 'mild' | 'medium' | 'severe' {
+  const dist = levenshtein(original.toLowerCase(), misspelled.toLowerCase());
+  const ratio = dist / Math.max(original.length, 1);
+  if (ratio <= 0.3) return 'mild';
+  if (ratio <= 0.6) return 'medium';
+  return 'severe';
+}
+
+const GAP_COPY: Record<'mild' | 'medium' | 'severe', string> = {
+  mild: "Honestly? He was so close. We're proud of him.",
+  medium: 'Look, he was really confident about this one.',
+  severe: 'This is a work of art. Questionable art, but art.',
+};
+
 export function ResultClient({ session }: ResultClientProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -47,10 +80,12 @@ export function ResultClient({ session }: ResultClientProps) {
   };
 
   const score = difficultyScore();
+  const gap = misspellingGap(session.originalName, selected.name);
+  const gapCopy = GAP_COPY[gap];
 
   function buildTweetText() {
     return encodeURIComponent(
-      `gave Barry Starr my name. he gave it his best shot.\n\nhis best shot was "${selected.name}"\n\nbarrystarr.app — find out what he'd call you ☕`
+      `gave Barry Starr my name. he gave it his absolute best shot.\n\nhis best shot was "${selected.name}"\n\nbarrystarr.app — what would Barry call you? ☕ #BarryStarr`
     );
   }
 
@@ -68,14 +103,14 @@ export function ResultClient({ session }: ResultClientProps) {
         {/* Reveal headline */}
         <div className="text-center mb-8">
           <h1 className="font-display text-4xl md:text-5xl font-bold mb-2" style={{ color: 'var(--espresso)' }}>
-            Close enough.{' '}
-            <em className="font-display font-normal" style={{ color: 'var(--steam-grey)', fontSize: '0.8em' }}>
-              (It is not close.)
-            </em>
+            Barry gave it his absolute best shot.
           </h1>
-          <p className="text-base" style={{ color: 'var(--steam-grey)' }}>
+          <p className="text-base" style={{ color: 'var(--cold-brew)' }}>
+            {gapCopy}
+          </p>
+          <p className="text-sm mt-1" style={{ color: 'var(--cold-brew)', opacity: 0.7 }}>
             Your name is a{' '}
-            <span className="font-bold" style={{ color: 'var(--caramel)' }}>
+            <span className="font-bold" style={{ color: 'var(--worn-leather)' }}>
               {score}/10
             </span>{' '}
             difficulty for baristas.
@@ -95,40 +130,40 @@ export function ResultClient({ session }: ResultClientProps) {
 
           {/* Name reveal */}
           <div className="text-center">
-            <p className="text-sm mb-1" style={{ color: 'var(--steam-grey)' }}>
+            <p className="text-sm mb-1" style={{ color: 'var(--cold-brew)' }}>
               Your name: <strong>{session.originalName}</strong>
             </p>
             <div
               className="inline-block px-8 py-4 rounded-2xl text-center"
-              style={{ background: 'var(--cream)', border: '2px solid #e0d5c5' }}
+              style={{ background: 'var(--chalk-white)', border: '2px solid #d9c9b0' }}
             >
               <p
                 className="font-marker text-5xl md:text-6xl"
-                style={{ color: 'var(--dark-roast)', transform: 'rotate(-1deg)', display: 'inline-block' }}
+                style={{ color: 'var(--espresso)', transform: 'rotate(-1deg)', display: 'inline-block' }}
               >
                 {selected.name}
               </p>
             </div>
           </div>
 
-          {/* Barista's excuse */}
+          {/* Barry's excuse */}
           <div
             className="w-full max-w-md rounded-xl px-6 py-4 text-center"
-            style={{ background: 'white', border: '1px solid #e0d5c5' }}
+            style={{ background: 'var(--chalk-white)', border: '1px solid #d9c9b0' }}
           >
             <span className="text-xl mr-2">💬</span>
-            <span className="italic text-base" style={{ color: 'var(--dark-roast)' }}>
+            <span className="italic text-base" style={{ color: 'var(--espresso)' }}>
               &ldquo;{selected.excuse}&rdquo;
             </span>
-            <p className="text-xs mt-1" style={{ color: 'var(--steam-grey)' }}>
-              — Your barista, probably.
+            <p className="text-xs mt-1" style={{ color: 'var(--cold-brew)' }}>
+              — Barry&apos;s excuse:
             </p>
           </div>
 
           {/* Other attempts */}
           {session.misspellings.length > 1 && (
             <div className="w-full max-w-md">
-              <p className="text-sm mb-3 text-center" style={{ color: 'var(--steam-grey)' }}>
+              <p className="text-sm mb-3 text-center" style={{ color: 'var(--cold-brew)' }}>
                 😅 Our barista also tried:
               </p>
               <div className="flex gap-2 justify-center flex-wrap">
@@ -138,9 +173,9 @@ export function ResultClient({ session }: ResultClientProps) {
                     onClick={() => setSelectedIndex(i)}
                     className="px-4 py-2 rounded-lg text-sm font-medium font-marker transition-all"
                     style={{
-                      background: i === selectedIndex ? 'var(--espresso)' : 'var(--cream)',
-                      color: i === selectedIndex ? 'white' : 'var(--dark-roast)',
-                      border: `2px solid ${i === selectedIndex ? 'var(--espresso)' : '#e0d5c5'}`,
+                      background: i === selectedIndex ? 'var(--espresso)' : 'var(--chalk-white)',
+                      color: i === selectedIndex ? 'white' : 'var(--espresso)',
+                      border: `2px solid ${i === selectedIndex ? 'var(--espresso)' : '#d9c9b0'}`,
                       transform: i === selectedIndex ? 'scale(1.05)' : 'scale(1)',
                     }}
                   >
@@ -148,7 +183,7 @@ export function ResultClient({ session }: ResultClientProps) {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-center mt-2 italic" style={{ color: 'var(--steam-grey)' }}>
+              <p className="text-xs text-center mt-2 italic" style={{ color: 'var(--cold-brew)' }}>
                 tap to cycle through the attempts
               </p>
             </div>
@@ -158,18 +193,18 @@ export function ResultClient({ session }: ResultClientProps) {
           {!uploadedPhotoUrl ? (
             <div
               className="w-full max-w-md rounded-2xl p-6 text-center"
-              style={{ background: 'var(--cream)', border: '2px dashed #d4a068' }}
+              style={{ background: 'var(--chalk-white)', border: '2px dashed var(--worn-leather)' }}
             >
               <p className="font-medium mb-1" style={{ color: 'var(--espresso)' }}>
                 Got a real one? Make it a battle.
               </p>
-              <p className="text-sm mb-4" style={{ color: 'var(--steam-grey)' }}>
+              <p className="text-sm mb-4" style={{ color: 'var(--cold-brew)' }}>
                 Did the real barista do worse or better than our AI?
               </p>
               <button
                 onClick={() => setShowUploadModal(true)}
                 className="px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all"
-                style={{ background: 'var(--caramel)' }}
+                style={{ background: 'var(--worn-leather)' }}
               >
                 📷 Upload Your Real Cup
               </button>
@@ -181,26 +216,36 @@ export function ResultClient({ session }: ResultClientProps) {
                 The battle:
               </p>
               <div className="flex items-center gap-3">
-                <div className="flex-1 rounded-xl overflow-hidden" style={{ border: '2px solid #e0d5c5' }}>
-                  <p className="text-xs text-center py-1 bg-amber-50 font-medium" style={{ color: 'var(--steam-grey)' }}>AI version</p>
+                <div className="flex-1 rounded-xl overflow-hidden" style={{ border: '2px solid #d9c9b0' }}>
+                  <p className="text-xs text-center py-1 font-medium" style={{ background: 'var(--chalk-white)', color: 'var(--cold-brew)' }}>AI version</p>
                   <CupDisplay imageUrl={imageUrl} misspelledName={selected.name} size="sm" />
                 </div>
                 <div className="vs-badge">VS</div>
-                <div className="flex-1 rounded-xl overflow-hidden" style={{ border: '2px solid #e0d5c5' }}>
-                  <p className="text-xs text-center py-1 bg-amber-50 font-medium" style={{ color: 'var(--steam-grey)' }}>Real life</p>
-                  <div className="relative h-40 bg-amber-50">
+                <div className="flex-1 rounded-xl overflow-hidden" style={{ border: '2px solid #d9c9b0' }}>
+                  <p className="text-xs text-center py-1 font-medium" style={{ background: 'var(--chalk-white)', color: 'var(--cold-brew)' }}>Real life</p>
+                  <div className="relative h-40" style={{ background: 'var(--chalk-white)' }}>
                     <Image src={uploadedPhotoUrl} alt="Your real cup" fill className="object-cover" sizes="200px" />
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-center mt-3" style={{ color: 'var(--steam-grey)' }}>
+              <p className="text-xs text-center mt-3" style={{ color: 'var(--cold-brew)' }}>
                 Added to the Wall of Shame →{' '}
-                <a href="/gallery" className="underline" style={{ color: 'var(--caramel)' }}>
+                <a href="/gallery" className="underline" style={{ color: 'var(--worn-leather)' }}>
                   See it in the gallery
                 </a>
               </p>
             </div>
           )}
+
+          {/* Barry's star sign-off */}
+          <div
+            className="w-full max-w-md rounded-xl px-6 py-4 text-center"
+            style={{ background: 'rgba(224, 62, 45, 0.07)', border: '1px solid rgba(224, 62, 45, 0.2)' }}
+          >
+            <p className="text-sm font-medium" style={{ color: 'var(--espresso)' }}>
+              Barry drew a little star on yours. That means he likes you. ⭐
+            </p>
+          </div>
 
           {/* Share buttons */}
           <div className="w-full max-w-md flex flex-col gap-3">
@@ -224,14 +269,14 @@ export function ResultClient({ session }: ResultClientProps) {
               <a
                 href="/"
                 className="flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-center transition-all"
-                style={{ background: 'var(--cream)', color: 'var(--espresso)', border: '2px solid #e0d5c5' }}
+                style={{ background: 'var(--chalk-white)', color: 'var(--espresso)', border: '2px solid #d9c9b0' }}
               >
                 🔄 Try another name
               </a>
               <a
                 href="/gallery"
                 className="flex-1 py-3 px-4 rounded-xl text-sm font-semibold text-center transition-all"
-                style={{ background: 'var(--cream)', color: 'var(--espresso)', border: '2px solid #e0d5c5' }}
+                style={{ background: 'var(--chalk-white)', color: 'var(--espresso)', border: '2px solid #d9c9b0' }}
               >
                 🏆 Wall of Shame
               </a>
