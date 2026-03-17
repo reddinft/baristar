@@ -123,6 +123,20 @@ QUALITY CHECK before outputting:
 ✓ Does each excuse sound like Barry said it?
 ✗ Reject anything that's just a letter swap or addition with no story
 
+ANTI-PATTERNS (these consistently score 1-2/5 — avoid them):
+✗ PHONETIC_LITERALIST that just adds/drops a letter (Bary, Skipp, Nissen = boring)
+✗ GENDER_INVERSION that's just a simple name swap (Joe for Jo, Michelle for Michael = lazy)
+✗ COMPLETE_FABRICATION that severs all connection to the original (Barnaby Thorne for Bartholomew = confusing, not funny)
+✗ Returning the exact original correct spelling — NEVER do this
+✗ PHONETIC_REPARSE that doesn't land on a real word or recognisable concept (Ema, Moe = just typos)
+
+HIGH-SCORING PATTERNS (these consistently score 4-5/5):
+✓ Map to a recognisable real thing — a word, pop culture reference, medical term, food, title (Alfredo for Al, Anesthesia for Anastasia, The Reverend for Vladimir)
+✓ Recontextualise rather than mutate — reframe what the name IS (Sir Maccabee, Persephone the Blessed, Colonel for Cornelius)
+✓ The "aha moment" test — someone should immediately understand WHY it's funny in under 2 seconds
+✓ ARGUMENT_WINNER is strong when Barry's logic is airtight even if wrong (Siobhan-Shuv-On, Micahel, Vlad-the-Impaler)
+✓ MEDICAL_INCIDENT works when the sound genuinely resembles a condition (Anesthesia for Anastasia, Keemia for Caoimhe, Otitis for Aoife)
+
 FEW-SHOT EXAMPLES:
 
 Input: "Vladimir"
@@ -136,6 +150,24 @@ Output options: "Kristopher Walken" (POP_CULTURE_OVERRIDE — the actor energy w
 
 Input: "Aoife"
 Output options: "Eefa" (PHONETIC_LITERALIST — wrote exactly what he heard), "Eva" (CULTURAL_REROUTE — landed somewhere Scandinavian), "The One He Couldn't Pronounce" (COMPLETE_FABRICATION — Barry just described the situation)
+
+Input: "Anastasia"
+Output options: "Anesthesia" (MEDICAL_INCIDENT — sounds like a surgical procedure, Barry was very confident), "Anastasia the Blessed" needs IMPROVING — don't do this lazy add-on, "Anuhstayzhuh" is also weak — instead try "Stacey" (RADICAL_ABBREVIATION — Barry gave up after the third syllable, honestly fair enough)
+
+Input: "Macca"
+Output options: "Sir Maccabee" (UNSOLICITED_PROMOTION — Barry knighted him, clearly a knight's name), "Maximus" (FALSE_ETYMOLOGY — Barry theorised this was the diminutive of the Roman general's name), "Maccá" (CULTURAL_REROUTE — the accent mark felt important, possibly Portuguese)
+
+Input: "Al"
+Output options: "Alfredo" (FOOD_ASSOCIATION — Barry's brain autocompleted to the pasta sauce, the espresso machine didn't help), "Leonidas" (FALSE_ETYMOLOGY — Barry theorised Al was short for something Greek and epic), "Ahl" (ARGUMENT_WINNER — customer said it with a guttural sound so Barry transcribed it faithfully)
+
+Input: "Nissan"
+Output options: "Nisson" (PHONETIC_REPARSE — heard 'Nis-awn', committed to it), "Titan" (THE_UPGRADE — Barry decided Nissan sounded too much like a car brand and upgraded it), "Nissander" (GENDER_INVERSION — heard strong masculine energy, added the classical suffix)
+
+VALIDATION (mandatory before outputting):
+✓ None of the 3 misspellings is the correct original spelling
+✓ Each misspelling maps to something recognisable — a real word, name, reference, or concept
+✓ The "aha moment" test: could you explain why it's funny in one sentence?
+✓ Barry's excuse reveals his SPECIFIC theory, not generic excuses like "the machine was loud"
 
 Return ONLY valid JSON in this exact format:
 {
@@ -270,6 +302,26 @@ Do not use any other archetypes. Do not swap these out. Barry has already commit
     }
 
     const result = JSON.parse(jsonMatch[0]) as MisspellingResult;
+
+    // Validate: reject any misspelling that exactly matches the original name (case-insensitive)
+    const validatedOptions = result.options.filter(opt =>
+      opt.misspelling.toLowerCase().trim() !== name.toLowerCase().trim()
+    );
+    if (validatedOptions.length < result.options.length) {
+      console.warn(`[barry] Rejected ${result.options.length - validatedOptions.length} exact-match misspelling(s) for "${name}"`);
+      result.options = validatedOptions;
+    }
+    // If we lost options, pad with a guaranteed different one
+    while (result.options.length < 3) {
+      result.options.push({
+        rank: result.options.length + 1,
+        misspelling: name + " (The Barista's Version)",
+        pattern: "COMPLETE_FABRICATION",
+        baristas_excuse: "Look, I tried my best. The Sharpie felt right."
+      });
+    }
+    // Re-rank
+    result.options = result.options.map((opt, i) => ({ ...opt, rank: i + 1 }));
 
     // 5. Store in cache (fire-and-forget, never crash on failure)
     setCachedMisspelling(cacheKey, name, selectedArchetypes, result, !!voiceMetadata).catch(
