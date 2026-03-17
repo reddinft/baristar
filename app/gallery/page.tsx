@@ -65,25 +65,44 @@ export default function GalleryPage() {
     <div className="min-h-screen px-4 py-8">
       <div className="max-w-5xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 gap-4">
-          <div>
-            <h1
-              className="font-display text-4xl font-bold mb-1"
-              style={{ color: 'var(--espresso)' }}
+        <div className="relative rounded-2xl overflow-hidden mb-8">
+          {/* Blurred gallery background */}
+          <div
+            className="absolute inset-0"
+            style={{
+              backgroundImage: "url('/brand/barry-gallery-bg.jpg')",
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              filter: 'blur(2px)',
+              transform: 'scale(1.05)',
+            }}
+          />
+          {/* Dark overlay */}
+          <div
+            className="absolute inset-0"
+            style={{ background: 'rgba(44, 26, 14, 0.6)' }}
+          />
+          {/* Content */}
+          <div className="relative flex flex-col sm:flex-row sm:items-center justify-between px-6 py-8 gap-4">
+            <div>
+              <h1
+                className="font-display text-4xl font-bold mb-1"
+                style={{ color: '#FFF8F0' }}
+              >
+                The Wall of Shame ⭐
+              </h1>
+              <p style={{ color: 'rgba(255,248,240,0.8)' }}>
+                Every cup Barry&apos;s ever made. He&apos;s proud of all of them.
+              </p>
+            </div>
+            <a
+              href="/"
+              className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold flex-shrink-0"
+              style={{ background: 'var(--barry-red)', color: 'white' }}
             >
-              The Wall of Shame ⭐
-            </h1>
-            <p style={{ color: 'var(--cold-brew)' }}>
-              Every cup Barry&apos;s ever made. He&apos;s proud of all of them.
-            </p>
+              Let Barry have a go at yours →
+            </a>
           </div>
-          <a
-            href="/"
-            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold flex-shrink-0"
-            style={{ background: 'var(--barry-red)', color: 'white' }}
-          >
-            Let Barry have a go at yours →
-          </a>
         </div>
 
         {/* Empty state */}

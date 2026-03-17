@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 const LOADING_MESSAGES = [
   "They're squinting at the name. The squinting is not going well.",
@@ -226,18 +227,34 @@ export default function Home() {
     <div className="min-h-screen flex flex-col items-center px-4">
       {/* Hero */}
       <section className="flex flex-col items-center text-center pt-16 pb-12 w-full max-w-2xl">
-        <div className="mb-6">
-          <span className="text-6xl">☕</span>
-        </div>
         <h1
           className="font-display font-bold mb-4 leading-tight"
           style={{ color: 'var(--espresso)' }}
         >
-          <span className="block text-5xl md:text-6xl">Hi, I&apos;m Barry Starr.</span>
+          <span className="flex items-center justify-center gap-4 text-5xl md:text-6xl">
+            <Image
+              src="/brand/barry-portrait.jpg"
+              alt="Barry Starr"
+              width={80}
+              height={80}
+              className="rounded-full object-cover flex-shrink-0"
+              style={{ border: '3px solid var(--worn-leather)' }}
+            />
+            Hi, I&apos;m Barry Starr.
+          </span>
           <span className="block text-3xl md:text-4xl mt-2" style={{ color: 'var(--cold-brew)' }}>
             I&apos;ll be your barista today.
           </span>
         </h1>
+        <Image
+          src="/brand/barry-hero.jpg"
+          alt="Barry Starr behind the coffee counter"
+          width={1200}
+          height={675}
+          className="w-full rounded-xl object-cover mb-8"
+          style={{ maxHeight: '300px' }}
+          priority
+        />
         <p className="text-lg md:text-xl mb-2" style={{ color: 'var(--cold-brew)' }}>
           Tell me your name. I&apos;ll write it on your cup.
         </p>

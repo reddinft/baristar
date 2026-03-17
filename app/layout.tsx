@@ -21,6 +21,11 @@ export const metadata: Metadata = {
     type: 'website',
     url: 'https://barrystarr.app',
     siteName: 'Barry Starr',
+    images: [{ url: 'https://barrystarr.app/brand/barry-cup.jpg', width: 800, height: 600, alt: 'A coffee cup with a misspelled name — Barry Starr' }],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    images: ['https://barrystarr.app/brand/barry-cup.jpg'],
   },
 };
 
