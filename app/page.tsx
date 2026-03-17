@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { useBarryAudio } from '@/hooks/useBarryAudio';
 
 const LOADING_MESSAGES = [
   "They're squinting at the name. The squinting is not going well.",
@@ -41,6 +42,28 @@ export default function Home() {
   const [loadingMsgIndex, setLoadingMsgIndex] = useState(0);
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Barry audio
+  const { playWelcome, playWriting, stopAll } = useBarryAudio();
+  const hasPlayedWelcome = useRef(false);
+  const [muted, setMuted] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('barry-muted') === 'true';
+  });
+
+  const handleFirstInteraction = useCallback(() => {
+    if (!hasPlayedWelcome.current) {
+      hasPlayedWelcome.current = true;
+      if (!muted) playWelcome();
+    }
+  }, [playWelcome, muted]);
+
+  const toggleMute = useCallback(() => {
+    const next = !muted;
+    setMuted(next);
+    localStorage.setItem('barry-muted', String(next));
+    if (next) stopAll();
+  }, [muted, stopAll]);
 
   // Voice state
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
@@ -188,6 +211,7 @@ export default function Home() {
     if (!canonical) return;
     setLoading(true);
     setError('');
+    if (!muted) playWriting();
     try {
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -202,11 +226,13 @@ export default function Home() {
         throw new Error(data.error || 'Something went wrong');
       }
       const data = await res.json();
+      stopAll();
       const resultUrl = data.fromCache
         ? `/result/${data.sessionId}?cached=1`
         : `/result/${data.sessionId}`;
       router.push(resultUrl);
     } catch (err) {
+      stopAll();
       setError(err instanceof Error ? err.message : 'Failed to generate your coffee name. Try again?');
       setLoading(false);
     }
@@ -225,6 +251,19 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4">
+      {/* Mute toggle */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          onClick={toggleMute}
+          title={muted ? 'Unmute Barry' : 'Mute Barry'}
+          aria-label={muted ? 'Unmute Barry' : 'Mute Barry'}
+          className="text-sm px-2 py-1 rounded-lg transition-all"
+          style={{ color: 'var(--cold-brew)', opacity: 0.7 }}
+        >
+          {muted ? '🔇' : '🔊'}
+        </button>
+      </div>
+
       {/* Hero */}
       <section className="flex flex-col items-center text-center pt-16 pb-12 w-full max-w-2xl">
         <h1
@@ -283,6 +322,7 @@ export default function Home() {
                   fontFamily: 'Inter, sans-serif',
                 }}
                 onFocus={(e) => {
+                  handleFirstInteraction();
                   e.target.style.boxShadow = '0 0 0 3px rgba(139, 90, 43, 0.2)';
                 }}
                 onBlur={(e) => {
@@ -294,7 +334,7 @@ export default function Home() {
               {/* Mic button */}
               <button
                 type="button"
-                onClick={handleMicClick}
+                onClick={() => { handleFirstInteraction(); handleMicClick(); }}
                 disabled={recordingState === 'transcribing' || loading}
                 title={
                   recordingState === 'recording'
