@@ -45,18 +45,29 @@ export default function Home() {
 
   // Barry audio
   const { playWelcome, playWriting, stopAll } = useBarryAudio();
-  const hasPlayedWelcome = useRef(false);
   const [muted, setMuted] = useState(() => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('barry-muted') === 'true';
   });
 
-  const handleFirstInteraction = useCallback(() => {
-    if (!hasPlayedWelcome.current) {
-      hasPlayedWelcome.current = true;
-      if (!muted) playWelcome();
+  // Splash screen state
+  const [splashDone, setSplashDone] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+
+  useEffect(() => {
+    const visited = localStorage.getItem('barry-visited');
+    if (visited) {
+      setSplashVisible(false);
+      setSplashDone(true);
     }
-  }, [playWelcome, muted]);
+  }, []);
+
+  const handleSplashTap = useCallback(() => {
+    if (!muted) playWelcome();
+    localStorage.setItem('barry-visited', 'true');
+    setSplashDone(true);
+    setTimeout(() => setSplashVisible(false), 700);
+  }, [muted, playWelcome]);
 
   const toggleMute = useCallback(() => {
     const next = !muted;
@@ -251,6 +262,40 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col items-center px-4">
+      {/* Tap-to-start splash overlay — first visit only */}
+      {splashVisible && (
+        <div
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center transition-opacity duration-700 ${splashDone ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+          style={{ backgroundColor: 'var(--espresso)' }}
+          onClick={handleSplashTap}
+        >
+          {/* Barry's portrait — circular */}
+          <div className="w-32 h-32 rounded-full overflow-hidden border-4 mb-6" style={{ borderColor: 'var(--barry-red)' }}>
+            <img src="/brand/barry-portrait.jpg" alt="Barry Starr" className="w-full h-full object-cover" />
+          </div>
+
+          {/* His name */}
+          <h1 className="font-display text-4xl font-bold mb-2" style={{ color: 'var(--oat-milk)' }}>
+            Barry Starr
+          </h1>
+          <p className="text-sm mb-10" style={{ color: 'var(--chalk-white)', opacity: 0.7 }}>
+            Your barista today
+          </p>
+
+          {/* Tap CTA — pulses gently */}
+          <button
+            className="px-8 py-4 rounded-full text-white font-semibold text-lg animate-pulse"
+            style={{ backgroundColor: 'var(--barry-red)' }}
+          >
+            ☕ Tap to meet Barry
+          </button>
+
+          <p className="text-xs mt-6" style={{ color: 'var(--chalk-white)', opacity: 0.4 }}>
+            🔊 Turn your sound on
+          </p>
+        </div>
+      )}
+
       {/* Mute toggle */}
       <div className="fixed top-4 right-4 z-50">
         <button
@@ -322,7 +367,6 @@ export default function Home() {
                   fontFamily: 'Inter, sans-serif',
                 }}
                 onFocus={(e) => {
-                  handleFirstInteraction();
                   e.target.style.boxShadow = '0 0 0 3px rgba(139, 90, 43, 0.2)';
                 }}
                 onBlur={(e) => {
@@ -334,7 +378,7 @@ export default function Home() {
               {/* Mic button */}
               <button
                 type="button"
-                onClick={() => { handleFirstInteraction(); handleMicClick(); }}
+                onClick={handleMicClick}
                 disabled={recordingState === 'transcribing' || loading}
                 title={
                   recordingState === 'recording'
