@@ -140,7 +140,7 @@ export async function generateMisspellings(name: string): Promise<MisspellingRes
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'gpt-5.4',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: name },
